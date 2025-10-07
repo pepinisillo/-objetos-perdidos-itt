@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Panel Administrador - Objetos Perdidos ITT</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--tertiary-color));
+            color: var(--text-light);
+            padding: 1rem 0;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .admin-section {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            min-height: 60vh;
+        }
+        
+        .admin-section h2 {
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        
+        .objects-list {
+            flex: 1;
+            max-height: none;
+            height: 100%;
+            min-height: 420px;
+            overflow-y: auto;
+            border: 1px solid var(--light-bg);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+        }
+        
+        .object-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--light-bg);
+            margin-bottom: 0.5rem;
+        }
+        
+        .object-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .object-info h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--primary-color);
+        }
+        
+        .object-info p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+        
+        .delete-btn {
+            background: #e74c3c;
+            color: var(--white);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+        
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+        
+        .logout-section {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .logout-btn {
+            background: var(--gray);
+            color: var(--white);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        .logout-btn:hover {
+            background: #34495e;
+        }
+        
+        .stats-display {
+            background: var(--light-bg);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-display h3 {
+            color: var(--primary-color);
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .stats-display p {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .admin-container {
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="admin-container">
+            <h1>Panel de Administración</h1>
+            <p>Objetos Perdidos ITT - Gestión</p>
+        </div>
+    </div>
+    
+    <div class="admin-container">
+        <!-- Estadísticas -->
+        <div class="stats-display">
+            <h3>Estadísticas del Sistema</h3>
+            <p>Total de objetos registrados: <span id="totalObjects">0</span></p>
+        </div>
+        
+        <div class="admin-grid">
+            <!-- Formulario para agregar objetos -->
+            <div class="admin-section">
+                <h2>+ Agregar Nuevo Objeto</h2>
+                <form id="addObjectForm">
+                    <div class="form-group">
+                        <label for="objectName">Nombre del Objeto</label>
+                        <input type="text" id="objectName" required placeholder="Ej: iPhone 13 Pro">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectCategory">Categoría</label>
+                        <select id="objectCategory" required>
+                            <option value="">Seleccionar categoría</option>
+                            <option value="electronico">Electrónicos</option>
+                            <option value="ropa">Ropa y Accesorios</option>
+                            <option value="cuadernos">Cuadernos y Materiales</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectDescription">Descripción (opcional)</label>
+                        <textarea id="objectDescription" placeholder="Descripción detallada del objeto..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectKeywords">Palabras clave (opcional, separadas por coma)</label>
+                        <input type="text" id="objectKeywords" placeholder="cel, celular, teléfono, iphone">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectLocation">Ubicación donde se encontró (opcional)</label>
+                        <input type="text" id="objectLocation" placeholder="Ej: Aula 205">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectDate">Fecha (opcional)</label>
+                        <input type="date" id="objectDate">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objectImage">URL de la imagen (opcional)</label>
+                        <input type="url" id="objectImage" placeholder="https://ejemplo.com/imagen.jpg">
+                    </div>
+                    <div class="form-group">
+                        <label for="objectImageFile">O subir imagen (opcional)</label>
+                        <input type="file" id="objectImageFile" accept="image/*">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        Agregar Objeto
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Lista de objetos -->
+            <div class="admin-section">
+                <h2>Objetos Registrados</h2>
+                <div class="objects-list" id="objectsList">
+                    <p>Cargando objetos...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botón de cerrar sesión -->
+        <div class="logout-section">
+            <button class="logout-btn" id="logoutBtn">
+                Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        // Fallbacks
+        window.CLOUDINARY_CLOUD_NAME = 'degnegwiu';
+        window.CLOUDINARY_UPLOAD_PRESET = 'objects';
+        window.USE_STORAGE = false; // Forzar Cloudinary/Imgur para evitar CORS de Storage
+    </script>
+    <script type="module">
+        import { 
+            secureLogout, 
+            addLostObjectSecure, 
+            getAllLostObjectsSecure, 
+            deleteLostObjectSecure,
+            isAdminLoggedIn,
+            currentUser
+        } from './firebase-auth.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+
+        // Guard robusto: usa utilidad centralizada
+        import { guardAdminPage } from './firebase-auth.js';
+        // Estado de autorización; bloquear UI hasta confirmar
+        let isAuthorized = false;
+        const addObjectFormEl = document.getElementById('addObjectForm');
+        if (addObjectFormEl) {
+            Array.from(addObjectFormEl.elements).forEach(el => el.disabled = true);
+        }
+
+        await guardAdminPage('admin-login.html');
+        isAuthorized = true;
+        if (addObjectFormEl) {
+            Array.from(addObjectFormEl.elements).forEach(el => el.disabled = false);
+        }
+        
+        // Inicializar Storage
+        const storage = getStorage();
+
+        // Subida alternativa a Imgur
+        async function uploadToImgur(file) {
+            if (!window.IMGUR_CLIENT_ID) {
+                throw new Error('IMGUR_CLIENT_ID no configurado');
+            }
+            const form = new FormData();
+            form.append('image', file);
+            const res = await fetch('https://api.imgur.com/3/image', {
+                method: 'POST',
+                headers: { Authorization: `Client-ID ${window.IMGUR_CLIENT_ID}` },
+                body: form
+            });
+            const data = await res.json();
+            if (!res.ok || !data?.success) {
+                throw new Error(data?.data?.error || 'Error subiendo a Imgur');
+            }
+            return data.data.link;
+        }
+
+        // Subida alternativa a Cloudinary (unsigned)
+        async function uploadToCloudinary(file) {
+            const cloudName = window.CLOUDINARY_CLOUD_NAME;
+            const uploadPreset = window.CLOUDINARY_UPLOAD_PRESET;
+            if (!cloudName || !uploadPreset) {
+                throw new Error('Cloudinary no configurado (CLOUDINARY_CLOUD_NAME/UPLOAD_PRESET)');
+            }
+            const form = new FormData();
+            form.append('file', file);
+            form.append('upload_preset', uploadPreset);
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: 'POST',
+                body: form
+            });
+            const data = await res.json();
+            if (!res.ok || !data?.secure_url) {
+                throw new Error(data?.error?.message || 'Error subiendo a Cloudinary');
+            }
+            return data.secure_url;
+        }
+        
+        const addObjectForm = document.getElementById('addObjectForm');
+        const objectsList = document.getElementById('objectsList');
+        const totalObjects = document.getElementById('totalObjects');
+        const logoutBtn = document.getElementById('logoutBtn');
+        
+        // Establecer fecha actual por defecto
+        document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
+        
+        // Cargar objetos al iniciar
+        loadObjects();
+        
+        // Manejar formulario de agregar objeto
+        addObjectForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isAuthorized) {
+                showNotification('No autorizado. Inicia sesión.', 'error');
+                return;
+            }
+            
+            const imageFile = document.getElementById('objectImageFile').files[0];
+            let imageUrl = document.getElementById('objectImage').value || getDefaultImage(document.getElementById('objectCategory').value);
+            
+            // Subir imagen si se seleccionó un archivo
+            if (imageFile) {
+                if (!isAuthorized) {
+                    showNotification('No autorizado. Inicia sesión.', 'error');
+                    return;
+                }
+                try {
+                    if (storage && window.USE_STORAGE !== false) {
+                        const imageRef = ref(storage, `objects/${Date.now()}_${imageFile.name}`);
+                        const snapshot = await uploadBytes(imageRef, imageFile);
+                        imageUrl = await getDownloadURL(snapshot.ref);
+                    } else {
+                        throw new Error('Storage no configurado');
+                    }
+                } catch (errorStorage) {
+                    console.warn('Storage falló, intentando Cloudinary:', errorStorage);
+                    try {
+                        imageUrl = await uploadToCloudinary(imageFile);
+                    } catch (errorCld) {
+                        console.warn('Cloudinary falló, intentando Imgur:', errorCld);
+                        try {
+                            imageUrl = await uploadToImgur(imageFile);
+                        } catch (errorImgur) {
+                            console.error('Subida a Imgur falló:', errorImgur);
+                            showNotification('No se pudo subir imagen. Usa una URL o configura Storage/Cloudinary/Imgur.', 'error');
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            const formData = {
+                name: document.getElementById('objectName').value,
+                category: document.getElementById('objectCategory').value,
+                description: document.getElementById('objectDescription').value,
+                keywords: document.getElementById('objectKeywords').value,
+                location: document.getElementById('objectLocation').value,
+                date: document.getElementById('objectDate').value,
+                image: imageUrl,
+                addedAt: new Date()
+            };
+            
+            try {
+                const result = await addLostObjectSecure(formData);
+                if (result.success) {
+                    addObjectForm.reset();
+                    document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
+                    showNotification('Objeto agregado exitosamente', 'success');
+                    loadObjects();
+                }
+            } catch (error) {
+                showNotification('Error al agregar objeto: ' + error.message, 'error');
+            }
+        });
+        
+        // Manejar cerrar sesión
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await secureLogout();
+                window.location.href = 'admin-login.html';
+            } catch (error) {
+                showNotification('Error al cerrar sesión', 'error');
+            }
+        });
+        
+        // Cargar objetos
+        async function loadObjects() {
+            try {
+                const objects = await getAllLostObjectsSecure();
+                renderObjects(objects);
+                totalObjects.textContent = objects.length;
+            } catch (error) {
+                objectsList.innerHTML = '<p>Error cargando objetos: ' + error.message + '</p>';
+            }
+        }
+        
+        // Renderizar objetos
+        function renderObjects(objects) {
+            if (objects.length === 0) {
+                objectsList.innerHTML = '<p>No hay objetos registrados</p>';
+                return;
+            }
+            
+            objectsList.innerHTML = objects.map(obj => `
+                <div class="object-item">
+                    <div style="display:flex; gap:1rem; align-items:center;">
+                        <div style="width:72px; height:72px; border-radius:8px; overflow:hidden; background:#f0f0f0; flex:0 0 72px; display:flex; align-items:center; justify-content:center;">
+                            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" style="width:100%; height:100%; object-fit:cover; display:block;"/>` : `<i class=\"fas fa-image\" style=\"color:#bbb; font-size:24px;\"></i>`}
+                        </div>
+                        <div class="object-info">
+                            <h4>${obj.name}</h4>
+                            <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
+                            <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
+                            <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
+                        </div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteObject('${obj.id}')">
+                        Eliminar
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        // Eliminar objeto
+        window.deleteObject = async function(objectId) {
+            if (confirm('¿Estás seguro de que quieres eliminar este objeto?')) {
+                try {
+                    await deleteLostObjectSecure(objectId);
+                    showNotification('Objeto eliminado exitosamente', 'success');
+                    loadObjects();
+                } catch (error) {
+                    showNotification('Error al eliminar objeto: ' + error.message, 'error');
+                }
+            }
+        };
+        
+        // Función para obtener imagen por defecto
+        function getDefaultImage(category) {
+            const defaultImages = {
+                'electronico': 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=400&h=300&fit=crop',
+                'ropa': 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop',
+                'cuadernos': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop'
+            };
+            return defaultImages[category] || defaultImages['electronico'];
+        }
+        
+        // Función para obtener nombre de categoría
+        function getCategoryName(categoryKey) {
+            const categoryNames = {
+                'electronico': 'Electrónico',
+                'ropa': 'Ropa',
+                'cuadernos': 'Cuadernos y Materiales'
+            };
+            return categoryNames[categoryKey] || categoryKey;
+        }
+        
+        // Función para mostrar notificaciones
+        function showNotification(message, type = 'info') {
+            // Crear o reutilizar un único toast en esquina
+            let toast = document.getElementById('globalToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'globalToast';
+                toast.style.position = 'fixed';
+                toast.style.right = '20px';
+                toast.style.bottom = '20px';
+                toast.style.padding = '12px 16px';
+                toast.style.borderRadius = '8px';
+                toast.style.color = '#fff';
+                toast.style.fontWeight = '600';
+                toast.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+                toast.style.zIndex = '5000';
+                toast.style.maxWidth = '320px';
+                toast.style.wordBreak = 'break-word';
+                document.body.appendChild(toast);
+            }
+            const colors = {
+                success: '#28a745',
+                error: '#dc3545',
+                info: '#007bff'
+            };
+            toast.style.background = colors[type] || colors.info;
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            // Auto-ocultar tras 3s
+            clearTimeout(window.__toastTimer);
+            window.__toastTimer = setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

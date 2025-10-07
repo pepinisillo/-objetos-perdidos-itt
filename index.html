@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página Web de Objetos Perdidos - Instituto Tecnológico de Tijuana</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Script de configuración -->
+    <script src="config.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-search"></i>
+                <h1>Objetos Perdidos ITT</h1>
+            </div>
+            <nav class="nav">
+                <a href="#inicio" class="nav-link active">Inicio</a>
+                <a href="#objetos" class="nav-link">Objetos Perdidos</a>
+                <!-- Acceso de administrador movido a página separada por seguridad -->
+                <a href="admin-login.html" class="admin-btn" style="display: none;">
+                    <i class="fas fa-user-shield"></i>
+                    Administrador
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="inicio" class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h2>¿Perdiste algo en el ITT?</h2>
+                <p>Encuentra tus objetos perdidos, puedes recogerlos en la caseta del estacionamiento</p>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number" id="totalObjetos">0</span>
+                        <span class="stat-label">Objetos Registrados</span>
+                    </div>
+                </div>
+            </div>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Buscar objetos perdidos...">
+                <select id="categoryFilter">
+                    <option value="">Todas las categorías</option>
+                    <option value="electronico">Electrónicos</option>
+                    <option value="ropa">Ropa y Accesorios</option>
+                    <option value="cuadernos">Cuadernos y Materiales</option>
+                    <option value="otros">Otros</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Section -->
+    <section class="categories-section">
+        <div class="container">
+            <h2>Explorar por Categorías</h2>
+            <div id="categoriesGrid" class="categories-grid">
+                <!-- Las categorías se cargarán dinámicamente aquí -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Objects Grid -->
+    <section id="objetos" class="objects-section">
+        <div class="container">
+            <h2>Objetos Perdidos Recientes</h2>
+            
+            <!-- Selector de elementos por página -->
+            <div class="items-per-page-selector">
+                <label for="itemsPerPageSelect">Mostrar:</label>
+                <select id="itemsPerPageSelect" onchange="changeItemsPerPage()">
+                    <option value="10">10 por página</option>
+                    <option value="20">20 por página</option>
+                    <option value="50">50 por página</option>
+                    <option value="100">100 por página</option>
+                </select>
+            </div>
+            
+            <div id="objectsGrid" class="objects-grid">
+                <!-- Los objetos se cargarán dinámicamente aquí -->
+            </div>
+            <div id="noObjects" class="no-objects" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <p>No hay objetos perdidos registrados actualmente</p>
+            </div>
+            
+            <!-- Controles de paginación -->
+            <div id="paginationControls" class="pagination-controls" style="display: none;">
+                <button id="prevPage" class="pagination-btn" onclick="goToPreviousPage()">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </button>
+                <div class="pagination-info">
+                    <span id="pageInfo">Página 1 de 1</span>
+                </div>
+                <button id="nextPage" class="pagination-btn" onclick="goToNextPage()">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Object Details Modal -->
+    <div id="objectDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="detailTitle">Detalle de Objeto</h2>
+                <span class="close object-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="object-details-layout">
+                    <div class="object-details-image">
+                        <img id="detailImage" src="" alt="Objeto" />
+                    </div>
+                    <div class="object-details-info">
+                        <p><strong>Categoría:</strong> <span id="detailCategory"></span></p>
+                        <p><strong>Descripción:</strong> <span id="detailDescription"></span></p>
+                        <p><strong>Ubicación:</strong> <span id="detailLocation"></span></p>
+                        <p><strong>Fecha:</strong> <span id="detailDate"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Panel de Administrador</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="loginForm" class="admin-form">
+                    <h3>Iniciar Sesión</h3>
+                    <input type="password" id="adminPassword" placeholder="Contraseña de administrador">
+                    <button id="loginBtn" class="btn-primary">Ingresar</button>
+                </div>
+                <div id="adminPanel" class="admin-panel" style="display: none;">
+                    <h3>Registrar Objeto Perdido</h3>
+                    <form id="objectForm">
+                        <div class="form-group">
+                            <label for="objectName">Nombre del Objeto</label>
+                            <input type="text" id="objectName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="objectCategory">Categoría</label>
+                            <select id="objectCategory" required>
+                                <option value="">Seleccionar categoría</option>
+                                <option value="electronico">Electrónicos</option>
+                                <option value="ropa">Ropa y Accesorios</option>
+                                <option value="cuadernos">Cuadernos y Materiales</option>
+                                <option value="otros">Otros</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="objectDescription">Descripción (opcional)</label>
+                            <textarea id="objectDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="objectKeywords">Palabras clave (opcional, separadas por coma)</label>
+                            <input type="text" id="objectKeywords" placeholder="cel, celular, teléfono, iphone">
+                        </div>
+                        <div class="form-group">
+                            <label for="objectLocation">Lugar donde se encontró (opcional)</label>
+                            <input type="text" id="objectLocation">
+                        </div>
+                        <div class="form-group">
+                            <label for="objectDate">Fecha encontrado (opcional)</label>
+                            <input type="date" id="objectDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="objectImage">Imagen (URL opcional)</label>
+                            <input type="url" id="objectImage" placeholder="https://ejemplo.com/imagen.jpg">
+                        </div>
+                        <div class="form-group">
+                            <label for="objectImageFile">O subir imagen (opcional)</label>
+                            <input type="file" id="objectImageFile" accept="image/*">
+                        </div>
+                        <button type="submit" class="btn-primary">Registrar Objeto</button>
+                    </form>
+                    <div class="admin-objects">
+                        <h3>Objetos Registrados</h3>
+                        <div id="adminObjectsList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Instituto Tecnológico de Tijuana - Página Web de Objetos Perdidos</p>
+        </div>
+    </footer>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        // Fallbacks 
+        window.CLOUDINARY_CLOUD_NAME = 'degnegwiu';
+        window.CLOUDINARY_UPLOAD_PRESET = 'objects';
+        window.USE_STORAGE = false; // Forzar Cloudinary/Imgur para evitar CORS de Storage
+    </script>
+    <script type="module" src="script-firebase.js"></script>
+</body>
+</html>

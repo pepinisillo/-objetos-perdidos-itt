@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Acceso Administrador - Objetos Perdidos ITT</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .login-title {
+            color: var(--primary-color);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-subtitle {
+            color: var(--gray);
+            margin-bottom: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--light-bg);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: var(--transition);
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary-color), var(--tertiary-color));
+            color: var(--text-light);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 1rem;
+        }
+        
+        .login-btn:hover {
+            background: linear-gradient(135deg, var(--tertiary-color), var(--secondary-color));
+            transform: translateY(-2px);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .back-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .security-notice {
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <h1 class="login-title">Acceso Administrador</h1>
+            <p class="login-subtitle">Objetos Perdidos ITT</p>
+            
+            <form id="adminLoginForm">
+                <div class="form-group">
+                    <label for="adminEmail">Email de Administrador</label>
+                    <input type="email" id="adminEmail" required placeholder="admin@itt.edu.mx">
+                </div>
+                
+                <div class="form-group">
+                    <label for="adminPassword">Contraseña</label>
+                    <input type="password" id="adminPassword" required placeholder="••••••••">
+                </div>
+                
+                <button type="submit" class="login-btn" id="loginBtn">
+                    Iniciar Sesión
+                </button>
+                
+                <div class="error-message" id="errorMessage"></div>
+            </form>
+            
+            <a href="index.html" class="back-link">← Volver al sitio principal</a>
+            
+            <div class="security-notice">
+                <strong>🛡️ Acceso Seguro:</strong><br>
+                Este panel utiliza autenticación Firebase del lado del servidor. 
+                Solo usuarios autorizados pueden acceder.
+            </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script type="module">
+        import { secureAdminLogin } from './firebase-auth.js';
+        
+        const loginForm = document.getElementById('adminLoginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            // Mostrar loading
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Verificando...';
+            errorMessage.style.display = 'none';
+            
+            try {
+                console.log('Intentando login con:', email);
+                const result = await secureAdminLogin(email, password);
+                console.log('Resultado del login:', result);
+                
+                if (result.success) {
+                    console.log('Login exitoso, redirigiendo...');
+                    // Redirigir al panel de administración
+                    window.location.href = 'admin-panel.html';
+                } else {
+                    console.log('Login fallido:', result.error);
+                    // Mostrar error
+                    errorMessage.textContent = result.error || 'Credenciales incorrectas';
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error en login:', error);
+                errorMessage.textContent = 'Error de conexión. Intenta de nuevo.';
+                errorMessage.style.display = 'block';
+            }
+            
+            // Restaurar botón
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Iniciar Sesión';
+        });
+    </script>
+</body>
+</html>

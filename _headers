@@ -1,0 +1,7 @@
+/admin-panel.html
+  Basic-Auth: admin pe12345!
+  X-Robots-Tag: noindex, nofollow
+
+/admin-login.html
+  Basic-Auth: admin pe12345!
+  X-Robots-Tag: noindex, nofollow
