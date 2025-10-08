@@ -24,7 +24,7 @@ jobs:
       
     - name: Deploy to Netlify
       run: |
-        netlify deploy --prod --dir=objetos-perdidos-web
+        netlify deploy --prod --dir=.
       env:
         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
