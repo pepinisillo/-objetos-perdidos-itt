@@ -828,14 +828,14 @@ body::before {
     /* Categorías - 4 columnas en móvil manteniendo aspecto cuadrado */
     .categories-section .categories-grid {
         grid-template-columns: repeat(4, 1fr) !important;
-        gap: 0.5rem !important;
+        gap: 0.3rem !important;
         max-width: 100%;
         margin: 0 auto;
     }
     
     .categories-section .category-card {
-        height: 80px !important;
-        width: 80px !important;
+        height: 90px !important;
+        width: 90px !important;
         aspect-ratio: 1 / 1 !important;
         display: flex !important;
         flex-direction: column !important;
@@ -843,7 +843,7 @@ body::before {
     }
     
     .categories-section .category-image {
-        height: 50px !important;
+        height: 55px !important;
         flex-shrink: 0 !important;
     }
     
@@ -856,16 +856,26 @@ body::before {
     }
     
     .categories-section .category-name {
-        font-size: 0.6rem !important;
+        font-size: 0.65rem !important;
         margin: 0 !important;
         text-align: center !important;
         line-height: 1 !important;
     }
     
     .categories-section .category-count {
-        font-size: 0.5rem !important;
+        font-size: 0.55rem !important;
         margin: 0 !important;
         text-align: center !important;
+    }
+    
+    /* Iconos más pequeños cuando no hay objetos */
+    .categories-section .category-image-item.fallback {
+        font-size: 1rem !important;
+    }
+    
+    .categories-section .category-image-item img {
+        max-width: 80% !important;
+        max-height: 80% !important;
     }
 }
 
