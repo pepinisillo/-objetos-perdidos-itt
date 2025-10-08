@@ -37,7 +37,6 @@ body {
     background: var(--background);
     min-height: 100vh;
     position: relative;
-    padding-top: 80px; /* Espacio para header fijo */
 }
 
 body::before {
@@ -67,14 +66,11 @@ body::before {
     color: var(--text-light);
     padding: 1.5rem 0;
     box-shadow: none;
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
     z-index: 1000;
     backdrop-filter: none;
     border-bottom: none;
-    width: 100%;
 }
 
 .header .container {
@@ -682,7 +678,7 @@ body::before {
 }
 
 @media (max-width: 768px) {
-    /* Header compacto en móvil */
+    /* Header de navegación compacto en móvil */
     .header {
         padding: 0.8rem 0 !important;
     }
@@ -707,10 +703,6 @@ body::before {
     .header .admin-btn {
         padding: 0.5rem 1rem !important;
         font-size: 0.8rem !important;
-    }
-    
-    body {
-        padding-top: 60px !important; /* Menos espacio para header compacto */
     }
     
     /* Barra de búsqueda en línea */
