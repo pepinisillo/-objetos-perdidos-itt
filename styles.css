@@ -699,29 +699,31 @@ body::before {
         margin-bottom: 1rem;
     }
     
-    .objects-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-    }
-    .object-card {
-        width: 100%;
-        aspect-ratio: 1 / 1;
+    /* Objetos perdidos - 2 columnas en móvil */
+    .objects-section .objects-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 1rem !important;
     }
     
-    /* Ajustar categorías para móvil - mantener proporciones */
-    .categories-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1.5rem;
+    .objects-section .object-card {
+        width: 100% !important;
+        aspect-ratio: 1 / 1 !important;
+    }
+    
+    /* Categorías - 2 columnas en móvil con proporciones correctas */
+    .categories-section .categories-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 1.5rem !important;
         max-width: 600px;
         margin: 0 auto;
     }
     
-    .category-card {
-        height: 200px;
+    .categories-section .category-card {
+        height: 200px !important;
     }
     
-    .category-image {
-        height: 120px;
+    .categories-section .category-image {
+        height: 120px !important;
     }
 }
 
