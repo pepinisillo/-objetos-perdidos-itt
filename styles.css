@@ -37,6 +37,7 @@ body {
     background: var(--background);
     min-height: 100vh;
     position: relative;
+    padding-top: 80px; /* Espacio para header fijo */
 }
 
 body::before {
@@ -66,8 +67,11 @@ body::before {
     color: var(--text-light);
     padding: 1.5rem 0;
     box-shadow: none;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
     z-index: 1000;
     backdrop-filter: none;
     border-bottom: none;
@@ -678,31 +682,53 @@ body::before {
 }
 
 @media (max-width: 768px) {
-    /* Header de navegación compacto en móvil */
+    /* Header de navegación compacto y fijo en móvil */
     .header {
-        padding: 0.8rem 0 !important;
+        padding: 0.6rem 0 !important;
+    }
+    
+    .header .container {
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
     }
     
     .header .logo h1 {
-        font-size: 1.2rem !important;
+        font-size: 1rem !important;
+        white-space: nowrap !important;
     }
     
     .header .logo i {
-        font-size: 1.5rem !important;
+        font-size: 1.2rem !important;
     }
     
     .header .nav {
-        gap: 1rem !important;
+        gap: 0.5rem !important;
+        flex-wrap: nowrap !important;
     }
     
     .header .nav-link {
-        padding: 0.4rem 0.8rem !important;
-        font-size: 0.9rem !important;
+        padding: 0.3rem 0.6rem !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap !important;
     }
     
     .header .admin-btn {
-        padding: 0.5rem 1rem !important;
-        font-size: 0.8rem !important;
+        padding: 0.4rem 0.8rem !important;
+        font-size: 0.7rem !important;
+        white-space: nowrap !important;
+    }
+    
+    body {
+        padding-top: 60px !important; /* Menos espacio para header compacto */
+    }
+    
+    /* Títulos en una sola línea */
+    .categories-section h2,
+    .objects-section h2 {
+        font-size: 1.8rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     
     /* Barra de búsqueda en línea */
@@ -767,32 +793,35 @@ body::before {
         aspect-ratio: 1 / 1 !important;
     }
     
-    /* Categorías - 4 columnas en móvil en una sola hilera */
+    /* Categorías - 4 columnas en móvil manteniendo aspecto cuadrado */
     .categories-section .categories-grid {
         grid-template-columns: repeat(4, 1fr) !important;
-        gap: 0.8rem !important;
+        gap: 0.6rem !important;
         max-width: 100%;
         margin: 0 auto;
     }
     
     .categories-section .category-card {
-        height: 140px !important;
+        height: 120px !important;
+        width: 100% !important;
+        aspect-ratio: 1 / 1 !important;
     }
     
     .categories-section .category-image {
-        height: 80px !important;
+        height: 70px !important;
     }
     
     .categories-section .category-info {
-        padding: 0.5rem !important;
+        padding: 0.3rem !important;
     }
     
     .categories-section .category-name {
-        font-size: 0.8rem !important;
+        font-size: 0.7rem !important;
+        margin-bottom: 0.2rem !important;
     }
     
     .categories-section .category-count {
-        font-size: 0.7rem !important;
+        font-size: 0.6rem !important;
     }
 }
 
