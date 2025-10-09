@@ -514,26 +514,10 @@ function generatePageNumbers(currentPage, totalPages) {
         startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
     
-    // Página anterior con "..."
-    if (startPage > 1) {
-        pageNumbersHTML += `<button class="page-number" onclick="goToPage(1)">1</button>`;
-        if (startPage > 2) {
-            pageNumbersHTML += `<span class="page-ellipsis">...</span>`;
-        }
-    }
-    
-    // Páginas visibles
+    // Solo mostrar páginas visibles sin puntos suspensivos
     for (let i = startPage; i <= endPage; i++) {
         const isActive = i === currentPage ? 'active' : '';
         pageNumbersHTML += `<button class="page-number ${isActive}" onclick="goToPage(${i})">${i}</button>`;
-    }
-    
-    // Página siguiente con "..."
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            pageNumbersHTML += `<span class="page-ellipsis">...</span>`;
-        }
-        pageNumbersHTML += `<button class="page-number" onclick="goToPage(${totalPages})">${totalPages}</button>`;
     }
     
     pageNumbersContainer.innerHTML = pageNumbersHTML;
