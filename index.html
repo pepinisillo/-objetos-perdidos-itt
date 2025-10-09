@@ -12,7 +12,7 @@
 </head>
 <body>
     <!-- Header -->
-    <header class="header">
+    <header class="top-navbar">
         <div class="container">
             <div class="logo">
                 <i class="fas fa-search"></i>
@@ -46,6 +46,9 @@
             <div class="search-box">
                 <i class="fas fa-search"></i>
                 <input type="text" id="searchInput" placeholder="Buscar objetos perdidos...">
+                <button type="button" class="search-clear-btn" onclick="clearSearch()" title="Limpiar búsqueda">
+                    <i class="fas fa-times"></i>
+                </button>
                 <select id="categoryFilter">
                     <option value="">Todas las categorías</option>
                     <option value="electronico">Electrónicos</option>
@@ -96,9 +99,12 @@
                 <button id="prevPage" class="pagination-btn" onclick="goToPreviousPage()">
                     <i class="fas fa-chevron-left"></i> Anterior
                 </button>
-                <div class="pagination-info">
-                    <span id="pageInfo">Página 1 de 1</span>
+                
+                <!-- Números de página -->
+                <div id="pageNumbers" class="page-numbers">
+                    <!-- Los números se generarán dinámicamente -->
                 </div>
+                
                 <button id="nextPage" class="pagination-btn" onclick="goToNextPage()">
                     Siguiente <i class="fas fa-chevron-right"></i>
                 </button>
@@ -128,6 +134,12 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Image Zoom Modal -->
+    <div id="imageZoomModal" class="modal image-zoom-modal">
+        <span class="close image-zoom-close">&times;</span>
+        <img id="zoomedImage" class="zoomed-image" src="" alt="Imagen ampliada">
     </div>
 
     <!-- Admin Modal -->

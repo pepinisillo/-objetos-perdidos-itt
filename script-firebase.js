@@ -89,7 +89,7 @@ function startRealtimeListener() {
     renderObjects();
     renderCategories();
     updateStats();
-        if (adminObjectsList) renderAdminObjects();
+        // renderAdminObjects() se maneja en admin-panel.html
     }, (error) => {
         console.error('Firestore onSnapshot error:', error);
     });
@@ -104,6 +104,7 @@ function startRealtimeListener() {
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
+    setupImageZoom();
     // Render inicial seguro
     try {
         if (typeof renderCategories === 'function') renderCategories();
@@ -201,6 +202,7 @@ function setupEventListeners() {
             }
         });
     }
+    
 }
 
 // (legacy) eliminado: el admin real vive en admin-panel.html
@@ -213,7 +215,7 @@ function showLoginForm() {
 function showAdminPanel() {
     loginForm.style.display = 'none';
     adminPanel.style.display = 'block';
-    renderAdminObjects();
+    // renderAdminObjects() se maneja en admin-panel.html
 }
 
 // Agregar objeto (solo si mantienes formulario público con permisos)
@@ -345,34 +347,27 @@ function filterByCategory(categoryKey) {
     
     // Scroll hacia la sección de objetos
     document.getElementById('objetos').scrollIntoView({ behavior: 'smooth' });
-    
-    // Mostrar notificación
-    const categoryName = getCategoryName(categoryKey);
-    showNotification(`Mostrando objetos de la categoría: ${categoryName}`, 'info');
 }
 
 // Hacer función global
 window.filterByCategory = filterByCategory;
 
-
-function renderAdminObjects() {
-    if (!adminObjectsList) return;
+// Función para limpiar búsqueda
+function clearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
     
-    adminObjectsList.innerHTML = lostObjects.map(obj => `
-        <div class="admin-object-item">
-            <div class="admin-object-info">
-                <h4>${obj.name}</h4>
-                <p>${getCategoryName(obj.category)} - ${obj.location || 'No especificado'} - ${formatDate(obj.date)}</p>
-                <p style="color: #6C757D">⏳ Registrado</p>
-            </div>
-            <div>
-                <button onclick="deleteObject('${obj.id}')" class="btn-danger">
-                    <i class="fas fa-trash"></i> Eliminar
-                </button>
-            </div>
-        </div>
-    `).join('');
+    searchInput.value = '';
+    categoryFilter.value = '';
+    
+    filterObjects(); // Ya maneja el reset de página internamente
 }
+
+// Hacer función global
+window.clearSearch = clearSearch;
+
+
+// Función renderAdminObjects movida al admin-panel.html
 
 // Función para eliminar objeto (ya no se usa toggleObjectStatus)
 
@@ -430,7 +425,7 @@ function filterObjects() {
     });
 
     currentPage = 1; // Reset a la primera página
-    renderObjects(filtered);
+    renderObjects(filtered, true); // Resetear página cuando se filtran objetos
 }
 
 // Función para normalizar texto (quitar acentos, convertir a minúsculas)
@@ -453,9 +448,13 @@ function updateStats() {
     }
 }
 
-function renderObjects(objectsToRender = lostObjects) {
+function renderObjects(objectsToRender = lostObjects, resetPage = true) {
     filteredObjects = objectsToRender;
-    currentPage = 1; // Reset a la primera página
+    
+    // Solo resetear la página si se especifica
+    if (resetPage) {
+        currentPage = 1;
+    }
     
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -493,13 +492,57 @@ function updatePaginationControls() {
     
     document.getElementById('prevPage').disabled = currentPage === 1;
     document.getElementById('nextPage').disabled = currentPage === totalPages;
-    document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+    
+    // Generar números de página
+    generatePageNumbers(currentPage, totalPages);
+}
+
+function generatePageNumbers(currentPage, totalPages) {
+    const pageNumbersContainer = document.getElementById('pageNumbers');
+    
+    if (!pageNumbersContainer) return;
+    
+    let pageNumbersHTML = '';
+    const maxVisiblePages = 1; // Máximo número de páginas visibles
+    
+    // Calcular el rango de páginas a mostrar
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Ajustar si estamos cerca del final
+    if (endPage - startPage < maxVisiblePages - 1) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    // Página anterior con "..."
+    if (startPage > 1) {
+        pageNumbersHTML += `<button class="page-number" onclick="goToPage(1)">1</button>`;
+        if (startPage > 2) {
+            pageNumbersHTML += `<span class="page-ellipsis">...</span>`;
+        }
+    }
+    
+    // Páginas visibles
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage ? 'active' : '';
+        pageNumbersHTML += `<button class="page-number ${isActive}" onclick="goToPage(${i})">${i}</button>`;
+    }
+    
+    // Página siguiente con "..."
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageNumbersHTML += `<span class="page-ellipsis">...</span>`;
+        }
+        pageNumbersHTML += `<button class="page-number" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+    }
+    
+    pageNumbersContainer.innerHTML = pageNumbersHTML;
 }
 
 function goToPreviousPage() {
     if (currentPage > 1) {
         currentPage--;
-        renderObjects(filteredObjects);
+        renderObjects(filteredObjects, false); // No resetear página
     }
 }
 
@@ -507,20 +550,29 @@ function goToNextPage() {
     const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
     if (currentPage < totalPages) {
         currentPage++;
-        renderObjects(filteredObjects);
+        renderObjects(filteredObjects, false); // No resetear página
     }
 }
 
 function changeItemsPerPage() {
     itemsPerPage = parseInt(document.getElementById('itemsPerPageSelect').value);
     currentPage = 1;
-    renderObjects(filteredObjects);
+    renderObjects(filteredObjects, true); // Resetear página cuando cambia items por página
+}
+
+function goToPage(pageNumber) {
+    const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+        currentPage = pageNumber;
+        renderObjects(filteredObjects, false); // No resetear página
+    }
 }
 
 // Hacer funciones globales para HTML
 window.goToPreviousPage = goToPreviousPage;
 window.goToNextPage = goToNextPage;
 window.changeItemsPerPage = changeItemsPerPage;
+window.goToPage = goToPage;
 window.showObjectDetails = showObjectDetails;
 
 // animateNumber eliminado (se usa actualización directa del contador)
@@ -536,7 +588,18 @@ function getCategoryName(category) {
 }
 
 function formatDate(dateString) {
+    // Si no hay fecha o está vacía, retornar "Sin fecha"
+    if (!dateString || dateString.trim() === '') {
+        return 'Sin fecha';
+    }
+    
     const date = new Date(dateString);
+    
+    // Si la fecha es inválida, retornar "Sin fecha"
+    if (isNaN(date.getTime())) {
+        return 'Sin fecha';
+    }
+    
     return date.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
@@ -612,3 +675,46 @@ window.addEventListener('scroll', function() {
         }
     });
 });
+
+// Función para configurar el zoom de imagen
+function setupImageZoom() {
+    const imageZoomModal = document.getElementById('imageZoomModal');
+    const zoomedImage = document.getElementById('zoomedImage');
+    const imageZoomClose = document.querySelector('.image-zoom-close');
+    
+    // Usar delegación de eventos para la imagen del modal de detalles
+    document.addEventListener('click', (e) => {
+        // Si se hace click en la imagen del modal de detalles
+        if (e.target && e.target.id === 'detailImage') {
+            const imgSrc = e.target.src;
+            if (imgSrc && imgSrc !== '') {
+                zoomedImage.src = imgSrc;
+                imageZoomModal.classList.add('show');
+            }
+        }
+    });
+    
+    // Cerrar el modal de zoom al hacer click en la X
+    if (imageZoomClose) {
+        imageZoomClose.addEventListener('click', (e) => {
+            e.stopPropagation();
+            imageZoomModal.classList.remove('show');
+        });
+    }
+    
+    // Cerrar el modal de zoom al hacer click en el fondo o imagen
+    if (imageZoomModal) {
+        imageZoomModal.addEventListener('click', (e) => {
+            if (e.target === imageZoomModal || e.target === zoomedImage) {
+                imageZoomModal.classList.remove('show');
+            }
+        });
+    }
+    
+    // Cerrar con la tecla Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && imageZoomModal && imageZoomModal.classList.contains('show')) {
+            imageZoomModal.classList.remove('show');
+        }
+    });
+}

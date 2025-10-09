@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex,nofollow">
     <title>Panel Administrador - Objetos Perdidos ITT</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .admin-header {
             background: linear-gradient(135deg, var(--primary-color), var(--tertiary-color));
@@ -202,12 +203,9 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="objectImage">URL de la imagen (opcional)</label>
-                        <input type="url" id="objectImage" placeholder="https://ejemplo.com/imagen.jpg">
-                    </div>
-                    <div class="form-group">
-                        <label for="objectImageFile">O subir imagen (opcional)</label>
-                        <input type="file" id="objectImageFile" accept="image/*">
+                        <label for="objectImageFile">Imagen del objeto *</label>
+                        <input type="file" id="objectImageFile" accept="image/*" required>
+                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF. Tamaño máximo: 5MB</small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary">
@@ -219,6 +217,20 @@
             <!-- Lista de objetos -->
             <div class="admin-section">
                 <h2>Objetos Registrados</h2>
+                
+                <!-- Buscador de objetos -->
+                <div class="admin-search-container">
+                    <div class="admin-search-box">
+                        <input type="text" id="adminObjectSearch" placeholder="Buscar objetos por nombre..." class="admin-search-input">
+                        <button type="button" class="admin-search-btn" onclick="searchAdminObjects()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button type="button" class="admin-clear-btn" onclick="clearAdminSearch()" title="Limpiar búsqueda">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="objects-list" id="objectsList">
                     <p>Cargando objetos...</p>
                 </div>
@@ -320,6 +332,9 @@
         // Cargar objetos al iniciar
         loadObjects();
         
+        // Configurar buscador
+        setupAdminSearch();
+        
         // Manejar formulario de agregar objeto
         addObjectForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -329,35 +344,40 @@
             }
             
             const imageFile = document.getElementById('objectImageFile').files[0];
-            let imageUrl = document.getElementById('objectImage').value || getDefaultImage(document.getElementById('objectCategory').value);
             
-            // Subir imagen si se seleccionó un archivo
-            if (imageFile) {
-                if (!isAuthorized) {
-                    showNotification('No autorizado. Inicia sesión.', 'error');
-                    return;
+            // Validar que se haya seleccionado una imagen
+            if (!imageFile) {
+                showNotification('Debes seleccionar una imagen del objeto', 'error');
+                return;
+            }
+            
+            let imageUrl = '';
+            
+            // Subir imagen
+            if (!isAuthorized) {
+                showNotification('No autorizado. Inicia sesión.', 'error');
+                return;
+            }
+            try {
+                if (storage && window.USE_STORAGE !== false) {
+                    const imageRef = ref(storage, `objects/${Date.now()}_${imageFile.name}`);
+                    const snapshot = await uploadBytes(imageRef, imageFile);
+                    imageUrl = await getDownloadURL(snapshot.ref);
+                } else {
+                    throw new Error('Storage no configurado');
                 }
+            } catch (errorStorage) {
+                console.warn('Storage falló, intentando Cloudinary:', errorStorage);
                 try {
-                    if (storage && window.USE_STORAGE !== false) {
-                        const imageRef = ref(storage, `objects/${Date.now()}_${imageFile.name}`);
-                        const snapshot = await uploadBytes(imageRef, imageFile);
-                        imageUrl = await getDownloadURL(snapshot.ref);
-                    } else {
-                        throw new Error('Storage no configurado');
-                    }
-                } catch (errorStorage) {
-                    console.warn('Storage falló, intentando Cloudinary:', errorStorage);
+                    imageUrl = await uploadToCloudinary(imageFile);
+                } catch (errorCld) {
+                    console.warn('Cloudinary falló, intentando Imgur:', errorCld);
                     try {
-                        imageUrl = await uploadToCloudinary(imageFile);
-                    } catch (errorCld) {
-                        console.warn('Cloudinary falló, intentando Imgur:', errorCld);
-                        try {
-                            imageUrl = await uploadToImgur(imageFile);
-                        } catch (errorImgur) {
-                            console.error('Subida a Imgur falló:', errorImgur);
-                            showNotification('No se pudo subir imagen. Usa una URL o configura Storage/Cloudinary/Imgur.', 'error');
-                            return;
-                        }
+                        imageUrl = await uploadToImgur(imageFile);
+                    } catch (errorImgur) {
+                        console.error('Subida a Imgur falló:', errorImgur);
+                        showNotification('Error al subir imagen. Intenta con otro archivo.', 'error');
+                        return;
                     }
                 }
             }
@@ -378,6 +398,7 @@
                 if (result.success) {
                     addObjectForm.reset();
                     document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('objectImageFile').value = '';
                     showNotification('Objeto agregado exitosamente', 'success');
                     loadObjects();
                 }
@@ -400,7 +421,9 @@
         async function loadObjects() {
             try {
                 const objects = await getAllLostObjectsSecure();
-                renderObjects(objects);
+                allObjects = objects;
+                filteredObjects = [...objects];
+                renderAdminObjects();
                 totalObjects.textContent = objects.length;
             } catch (error) {
                 objectsList.innerHTML = '<p>Error cargando objetos: ' + error.message + '</p>';
@@ -415,20 +438,16 @@
             }
             
             objectsList.innerHTML = objects.map(obj => `
-                <div class="object-item">
-                    <div style="display:flex; gap:1rem; align-items:center;">
-                        <div style="width:72px; height:72px; border-radius:8px; overflow:hidden; background:#f0f0f0; flex:0 0 72px; display:flex; align-items:center; justify-content:center;">
-                            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" style="width:100%; height:100%; object-fit:cover; display:block;"/>` : `<i class=\"fas fa-image\" style=\"color:#bbb; font-size:24px;\"></i>`}
-                        </div>
-                        <div class="object-info">
-                            <h4>${obj.name}</h4>
-                            <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
-                            <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
-                            <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
-                        </div>
+                <div class="admin-object-item">
+                    <img src="${obj.image || 'https://via.placeholder.com/80x80?text=Sin+Imagen'}" alt="${obj.name}" class="admin-object-image">
+                    <div class="admin-object-info">
+                        <h4>${obj.name}</h4>
+                        <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
+                        <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
+                        <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
                     </div>
-                    <button class="delete-btn" onclick="deleteObject('${obj.id}')">
-                        Eliminar
+                    <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             `).join('');
@@ -500,6 +519,100 @@
             window.__toastTimer = setTimeout(() => {
                 toast.style.opacity = '0';
             }, 3000);
+        }
+        
+        // Variables globales para el buscador
+        let allObjects = [];
+        let filteredObjects = [];
+        
+        // Función para normalizar texto (quitar acentos)
+        function normalizeText(text) {
+            return text.normalize('NFD')
+                      .replace(/[\u0300-\u036f]/g, '')
+                      .toLowerCase()
+                      .trim();
+        }
+        
+        // Configurar buscador
+        function setupAdminSearch() {
+            const searchInput = document.getElementById('adminObjectSearch');
+            
+            // Búsqueda en tiempo real
+            searchInput.addEventListener('input', function() {
+                searchAdminObjects();
+            });
+            
+            // Búsqueda al presionar Enter
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAdminObjects();
+                }
+            });
+        }
+        
+        // Buscar objetos
+        function searchAdminObjects() {
+            const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
+            
+            if (!searchTerm) {
+                // Si no hay texto, mostrar todos los objetos
+                filteredObjects = [...allObjects];
+            } else {
+                // Si hay texto, filtrar por nombre
+                filteredObjects = allObjects.filter(obj => {
+                    const name = normalizeText(obj.name || '');
+                    return name.includes(searchTerm);
+                });
+            }
+            
+            renderAdminObjects();
+        }
+        
+        // Limpiar búsqueda
+        function clearAdminSearch() {
+            document.getElementById('adminObjectSearch').value = '';
+            filteredObjects = [...allObjects];
+            renderAdminObjects();
+        }
+        
+        // Hacer funciones globales
+        window.clearAdminSearch = clearAdminSearch;
+        window.searchAdminObjects = searchAdminObjects;
+        
+        // Función para renderizar objetos (modificada)
+        function renderAdminObjects() {
+            const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
+            
+            // Si hay texto de búsqueda pero no hay resultados
+            if (searchTerm && filteredObjects.length === 0) {
+                objectsList.innerHTML = '<p>No se encontraron objetos con ese nombre</p>';
+                return;
+            }
+            
+            // Si no hay texto de búsqueda y no hay objetos en total
+            if (!searchTerm && allObjects.length === 0) {
+                objectsList.innerHTML = '<p>No hay objetos registrados</p>';
+                return;
+            }
+            
+            // Mostrar objetos filtrados o todos si no hay búsqueda
+            const objectsToRender = searchTerm ? filteredObjects : allObjects;
+            
+            objectsList.innerHTML = objectsToRender.map(obj => `
+                <div class="admin-object-item">
+                    <img src="${obj.image || 'https://via.placeholder.com/80x80?text=Sin+Imagen'}" alt="${obj.name}" class="admin-object-image">
+                    <div class="admin-object-info">
+                        <h4>${obj.name}</h4>
+                        <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
+                        <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
+                        <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
+                    </div>
+                    <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
         }
     </script>
 </body>
