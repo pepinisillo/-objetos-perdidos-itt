@@ -503,7 +503,7 @@ function generatePageNumbers(currentPage, totalPages) {
     if (!pageNumbersContainer) return;
     
     let pageNumbersHTML = '';
-    const maxVisiblePages = 1; // Máximo número de páginas visibles
+    const maxVisiblePages = 3; // Máximo número de páginas visibles
     
     // Calcular el rango de páginas a mostrar
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
