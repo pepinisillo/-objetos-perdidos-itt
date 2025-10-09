@@ -535,6 +535,11 @@ function goToNextPage() {
     if (currentPage < totalPages) {
         currentPage++;
         renderObjects(filteredObjects, false); // No resetear página
+        // Scroll automático hacia la sección de objetos
+        const objetosSection = document.getElementById('objetos');
+        if (objetosSection) {
+            objetosSection.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 }
 
@@ -547,8 +552,17 @@ function changeItemsPerPage() {
 function goToPage(pageNumber) {
     const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
     if (pageNumber >= 1 && pageNumber <= totalPages) {
+        const previousPage = currentPage;
         currentPage = pageNumber;
         renderObjects(filteredObjects, false); // No resetear página
+        
+        // Scroll automático solo si se va hacia adelante (número mayor)
+        if (pageNumber > previousPage) {
+            const objetosSection = document.getElementById('objetos');
+            if (objetosSection) {
+                objetosSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
     }
 }
 
