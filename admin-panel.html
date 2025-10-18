@@ -7,6 +7,9 @@
     <title>Panel Administrador - Objetos Perdidos ITT</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Script de configuración -->
+    <script src="config.js"></script>
     <style>
         .admin-header {
             background: linear-gradient(135deg, var(--primary-color), var(--tertiary-color));
@@ -94,6 +97,54 @@
         
         .delete-btn:hover {
             background: #c0392b;
+        }
+        
+        .admin-object-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .admin-edit-btn {
+            background: transparent;
+            color: #28a745;
+            border: 2px solid #28a745;
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .admin-edit-btn:hover {
+            background: #28a745;
+            color: var(--white);
+        }
+        
+        .admin-delete-btn {
+            background: transparent;
+            color: var(--danger);
+            border: 2px solid var(--danger);
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .admin-delete-btn:hover {
+            background: var(--danger);
+            color: var(--white);
         }
         
         .logout-section {
@@ -203,9 +254,9 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="objectImageFile">Imagen del objeto *</label>
-                        <input type="file" id="objectImageFile" accept="image/*" required>
-                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF. Tamaño máximo: 5MB</small>
+                        <label for="objectImageFile">Imagen del objeto</label>
+                        <input type="file" id="objectImageFile" accept="image/*">
+                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF, WebP. <strong>Tamaño máximo: 2MB</strong>. <em>Opcional: Si no seleccionas una imagen, se mantendrá la actual.</em></small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary">
@@ -251,6 +302,7 @@
         window.CLOUDINARY_CLOUD_NAME = 'degnegwiu';
         window.CLOUDINARY_UPLOAD_PRESET = 'objects';
         window.USE_STORAGE = false; // Forzar Cloudinary/Imgur para evitar CORS de Storage
+        window.IMGUR_CLIENT_ID = '546c25a59c58ad7'; // Client ID público de Imgur
     </script>
     <script type="module">
         import { 
@@ -281,45 +333,22 @@
         // Inicializar Storage
         const storage = getStorage();
 
-        // Subida alternativa a Imgur
-        async function uploadToImgur(file) {
-            if (!window.IMGUR_CLIENT_ID) {
-                throw new Error('IMGUR_CLIENT_ID no configurado');
+        // Convertir archivo a base64
+        async function convertToBase64(file) {
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                return base64;
+            } catch (error) {
+                console.error('Error convirtiendo a base64:', error);
+                throw new Error('Error procesando la imagen');
             }
-            const form = new FormData();
-            form.append('image', file);
-            const res = await fetch('https://api.imgur.com/3/image', {
-                method: 'POST',
-                headers: { Authorization: `Client-ID ${window.IMGUR_CLIENT_ID}` },
-                body: form
-            });
-            const data = await res.json();
-            if (!res.ok || !data?.success) {
-                throw new Error(data?.data?.error || 'Error subiendo a Imgur');
-            }
-            return data.data.link;
         }
 
-        // Subida alternativa a Cloudinary (unsigned)
-        async function uploadToCloudinary(file) {
-            const cloudName = window.CLOUDINARY_CLOUD_NAME;
-            const uploadPreset = window.CLOUDINARY_UPLOAD_PRESET;
-            if (!cloudName || !uploadPreset) {
-                throw new Error('Cloudinary no configurado (CLOUDINARY_CLOUD_NAME/UPLOAD_PRESET)');
-            }
-            const form = new FormData();
-            form.append('file', file);
-            form.append('upload_preset', uploadPreset);
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                method: 'POST',
-                body: form
-            });
-            const data = await res.json();
-            if (!res.ok || !data?.secure_url) {
-                throw new Error(data?.error?.message || 'Error subiendo a Cloudinary');
-            }
-            return data.secure_url;
-        }
         
         const addObjectForm = document.getElementById('addObjectForm');
         const objectsList = document.getElementById('objectsList');
@@ -343,43 +372,31 @@
                 return;
             }
             
-            const imageFile = document.getElementById('objectImageFile').files[0];
-            
+            const imageFile = document.getElementById('objectImageFile').files[0];            
             // Validar que se haya seleccionado una imagen
             if (!imageFile) {
                 showNotification('Debes seleccionar una imagen del objeto', 'error');
                 return;
             }
             
-            let imageUrl = '';
-            
-            // Subir imagen
-            if (!isAuthorized) {
-                showNotification('No autorizado. Inicia sesión.', 'error');
+            // Validar tamaño de archivo (2MB máximo)
+            const maxSize = 2 * 1024 * 1024; // 2MB en bytes
+            if (imageFile.size > maxSize) {
+                showNotification('La imagen es muy grande. Máximo 2MB. Comprime la imagen antes de subirla.', 'error');
                 return;
             }
+            
+            let finalImageUrl = '';
+            
+            // Procesar imagen a base64
             try {
-                if (storage && window.USE_STORAGE !== false) {
-                    const imageRef = ref(storage, `objects/${Date.now()}_${imageFile.name}`);
-                    const snapshot = await uploadBytes(imageRef, imageFile);
-                    imageUrl = await getDownloadURL(snapshot.ref);
-                } else {
-                    throw new Error('Storage no configurado');
-                }
-            } catch (errorStorage) {
-                console.warn('Storage falló, intentando Cloudinary:', errorStorage);
-                try {
-                    imageUrl = await uploadToCloudinary(imageFile);
-                } catch (errorCld) {
-                    console.warn('Cloudinary falló, intentando Imgur:', errorCld);
-                    try {
-                        imageUrl = await uploadToImgur(imageFile);
-                    } catch (errorImgur) {
-                        console.error('Subida a Imgur falló:', errorImgur);
-                        showNotification('Error al subir imagen. Intenta con otro archivo.', 'error');
-                        return;
-                    }
-                }
+                showNotification('Procesando imagen...', 'info');
+                finalImageUrl = await convertToBase64(imageFile);
+                showNotification('¡Imagen procesada exitosamente!', 'success');
+            } catch (error) {
+                console.error('Procesamiento de imagen falló:', error);
+                showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
+                return;
             }
             
             const formData = {
@@ -389,7 +406,7 @@
                 keywords: document.getElementById('objectKeywords').value,
                 location: document.getElementById('objectLocation').value,
                 date: document.getElementById('objectDate').value,
-                image: imageUrl,
+                image: finalImageUrl,
                 addedAt: new Date()
             };
             
@@ -398,7 +415,6 @@
                 if (result.success) {
                     addObjectForm.reset();
                     document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
-                    document.getElementById('objectImageFile').value = '';
                     showNotification('Objeto agregado exitosamente', 'success');
                     loadObjects();
                 }
@@ -420,12 +436,51 @@
         // Cargar objetos
         async function loadObjects() {
             try {
+                console.log('Iniciando carga de objetos...');
                 const objects = await getAllLostObjectsSecure();
-                allObjects = objects;
-                filteredObjects = [...objects];
+                console.log('Objetos obtenidos de Firebase:', objects);
+                
+                // Debug: mostrar formato de fechas
+                console.log('Objetos cargados:', objects.length);
+                if (objects.length > 0) {
+                    console.log('Primer objeto:', objects[0]);
+                    console.log('Campos de fecha disponibles:', {
+                        addedAt: objects[0].addedAt,
+                        createdAt: objects[0].createdAt,
+                        timestamp: objects[0].timestamp,
+                        date: objects[0].date
+                    });
+                }
+                
+                // Ordenar del más reciente al más viejo por fecha de adición
+                allObjects = objects.sort((a, b) => {
+                    // Función helper para obtener fecha
+                    const getDate = (obj) => {
+                        const dateField = obj.addedAt || obj.createdAt || obj.timestamp || obj.date;
+                        if (!dateField) return new Date(0);
+                        
+                        // Si es timestamp de Firebase
+                        if (dateField.seconds) {
+                            return new Date(dateField.seconds * 1000);
+                        }
+                        
+                        // Si es string o número
+                        const date = new Date(dateField);
+                        return isNaN(date.getTime()) ? new Date(0) : date;
+                    };
+                    
+                    const dateA = getDate(a);
+                    const dateB = getDate(b);
+                    
+                    return dateB - dateA; // Más reciente primero
+                });
+                filteredObjects = [...allObjects];
+                console.log('Objetos ordenados:', allObjects);
                 renderAdminObjects();
                 totalObjects.textContent = objects.length;
+                console.log('Objetos renderizados exitosamente');
             } catch (error) {
+                console.error('Error cargando objetos:', error);
                 objectsList.innerHTML = '<p>Error cargando objetos: ' + error.message + '</p>';
             }
         }
@@ -463,6 +518,212 @@
                 } catch (error) {
                     showNotification('Error al eliminar objeto: ' + error.message, 'error');
                 }
+            }
+        };
+        
+        // Editar objeto
+        window.editObject = function(objectId) {
+            const object = allObjects.find(obj => obj.id === objectId);
+            if (!object) {
+                showNotification('Objeto no encontrado', 'error');
+                return;
+            }
+            
+            // Llenar el formulario con los datos del objeto
+            document.getElementById('objectName').value = object.name || '';
+            document.getElementById('objectCategory').value = object.category || '';
+            document.getElementById('objectDescription').value = object.description || '';
+            document.getElementById('objectKeywords').value = object.keywords || '';
+            document.getElementById('objectLocation').value = object.location || '';
+            document.getElementById('objectDate').value = object.date || '';
+            // La imagen actual se mantiene, solo se cambia si se selecciona una nueva
+            
+            // Cambiar el botón de agregar por actualizar
+            const submitBtn = addObjectForm.querySelector('button[type="submit"]');
+            submitBtn.textContent = 'Actualizar Objeto';
+            submitBtn.onclick = async (e) => {
+                e.preventDefault();
+                await updateObject(objectId);
+            };
+            
+            // Scroll al formulario
+            addObjectForm.scrollIntoView({ behavior: 'smooth' });
+            showNotification('Formulario llenado. Modifica los datos y presiona "Actualizar Objeto"', 'info');
+        };
+        
+        // Actualizar objeto
+        async function updateObject(objectId) {
+            // Obtener el objeto original para mantener la fecha de adición
+            const originalObject = allObjects.find(obj => obj.id === objectId);
+            console.log('Buscando objeto con ID:', objectId);
+            console.log('Objetos disponibles:', allObjects.map(obj => ({ id: obj.id, name: obj.name, addedAt: obj.addedAt })));
+            console.log('Objeto encontrado:', originalObject);
+            if (!isAuthorized) {
+                showNotification('No autorizado. Inicia sesión.', 'error');
+                return;
+            }
+            
+        const imageFile = document.getElementById('objectImageFile').files[0];
+        let finalImageUrl = originalObject.image; // Usar imagen existente por defecto
+
+        // Solo procesar nueva imagen si se seleccionó una
+        if (imageFile) {
+            // Validar tamaño de archivo (2MB máximo)
+            const maxSize = 2 * 1024 * 1024; // 2MB en bytes
+            if (imageFile.size > maxSize) {
+                showNotification('La imagen es muy grande. Máximo 2MB. Comprime la imagen antes de subirla.', 'error');
+                return;
+            }
+
+            // Procesar imagen a base64
+            try {
+                showNotification('Procesando imagen...', 'info');
+                finalImageUrl = await convertToBase64(imageFile);
+                showNotification('¡Imagen procesada exitosamente!', 'success');
+            } catch (error) {
+                console.error('Procesamiento de imagen falló:', error);
+                showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
+                return;
+            }
+        } else {
+            console.log('No se seleccionó nueva imagen, manteniendo la existente');
+        }
+            
+            // Convertir Timestamp de Firebase a Date
+            let originalAddedAt;
+            if (originalObject.addedAt && originalObject.addedAt.seconds) {
+                originalAddedAt = new Date(originalObject.addedAt.seconds * 1000);
+            } else if (originalObject.createdAt && originalObject.createdAt.seconds) {
+                originalAddedAt = new Date(originalObject.createdAt.seconds * 1000);
+            } else if (originalObject.timestamp) {
+                originalAddedAt = new Date(originalObject.timestamp);
+            } else {
+                originalAddedAt = new Date();
+            }
+            
+            const formData = {
+                name: document.getElementById('objectName').value,
+                category: document.getElementById('objectCategory').value,
+                description: document.getElementById('objectDescription').value,
+                keywords: document.getElementById('objectKeywords').value,
+                location: document.getElementById('objectLocation').value,
+                date: document.getElementById('objectDate').value,
+                image: finalImageUrl,
+                updatedAt: new Date(),
+                // Mantener la fecha original de adición
+                addedAt: originalAddedAt
+            };
+            
+            console.log('Objeto original:', originalObject);
+            console.log('Fecha original addedAt:', originalObject.addedAt);
+            console.log('Fecha original createdAt:', originalObject.createdAt);
+            console.log('Fecha que se va a usar:', formData.addedAt);
+            
+            try {
+                // Importar Firebase y configurar
+                const { initializeApp, getApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+                const { getFirestore, doc, updateDoc, setDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+                
+                // Usar la configuración global de Firebase
+                let app;
+                try {
+                    app = initializeApp(window.CONFIG.FIREBASE_CONFIG);
+                } catch (error) {
+                    // Si ya está inicializado, obtener la app existente
+                    app = getApp();
+                }
+                
+                const db = getFirestore(app);
+                let objectRef = doc(db, 'lostObjects', objectId);
+                
+                // Verificar si el documento existe
+                console.log('Verificando documento con ID:', objectId);
+                const docSnap = await getDoc(objectRef);
+                console.log('Documento existe:', docSnap.exists());
+                
+                if (!docSnap.exists()) {
+                    console.error('Documento no encontrado en Firebase. ID:', objectId);
+                    console.log('Intentando buscar por nombre y categoría...');
+                    
+                    // Buscar el objeto por nombre y categoría como alternativa
+                    const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+                    const objectsRef = collection(db, 'lostObjects');
+                    const q = query(
+                        objectsRef, 
+                        where('name', '==', formData.name),
+                        where('category', '==', formData.category)
+                    );
+                    
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        const foundDoc = querySnapshot.docs[0];
+                        const correctId = foundDoc.id;
+                        console.log('Documento encontrado por búsqueda:', correctId);
+                        objectRef = doc(db, 'lostObjects', correctId);
+                        
+                        // Actualizar el ID en la lista local para futuras referencias
+                        const localIndex = allObjects.findIndex(obj => obj.id === objectId);
+                        if (localIndex !== -1) {
+                            allObjects[localIndex].id = correctId;
+                            console.log('ID actualizado en lista local:', correctId);
+                        }
+                    } else {
+                        throw new Error(`No se encontró el documento con ID ${objectId} ni por búsqueda de nombre/categoría`);
+                    }
+                } else {
+                    console.log('Datos actuales del documento:', docSnap.data());
+                }
+                
+                // Preparar datos para actualizar (sin cambiar addedAt)
+                const updateData = {
+                    name: formData.name,
+                    category: formData.category,
+                    description: formData.description,
+                    keywords: formData.keywords,
+                    location: formData.location,
+                    date: formData.date,
+                    image: formData.image,
+                    updatedAt: formData.updatedAt
+                    // NO incluir addedAt para mantener la fecha original
+                };
+                
+                // Usar setDoc con merge para asegurar que funcione
+                console.log('Datos a actualizar:', updateData);
+                await setDoc(objectRef, updateData, { merge: true });
+                console.log('Documento actualizado exitosamente en Firebase');
+                
+                // Actualizar en la lista local para reflejar los cambios
+                const objectIndex = allObjects.findIndex(obj => obj.id === objectId);
+                if (objectIndex !== -1) {
+                    allObjects[objectIndex] = {
+                        ...allObjects[objectIndex],
+                        ...updateData
+                    };
+                    
+                    // Actualizar también en filteredObjects
+                    const filteredIndex = filteredObjects.findIndex(obj => obj.id === objectId);
+                    if (filteredIndex !== -1) {
+                        filteredObjects[filteredIndex] = allObjects[objectIndex];
+                    }
+                }
+                
+                // Re-renderizar la lista
+                renderAdminObjects();
+                
+                showNotification('Objeto actualizado exitosamente', 'success');
+                
+                // Restaurar el botón original
+                const submitBtn = addObjectForm.querySelector('button[type="submit"]');
+                submitBtn.textContent = 'Agregar Objeto';
+                submitBtn.onclick = null; // Restaurar el event listener original
+                
+                // Limpiar formulario
+                addObjectForm.reset();
+                document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
+                
+            } catch (error) {
+                console.error('Error actualizando en Firebase:', error);
+                showNotification('Error al actualizar objeto: ' + error.message, 'error');
             }
         };
         
@@ -576,10 +837,6 @@
             renderAdminObjects();
         }
         
-        // Hacer funciones globales
-        window.clearAdminSearch = clearAdminSearch;
-        window.searchAdminObjects = searchAdminObjects;
-        
         // Función para renderizar objetos (modificada)
         function renderAdminObjects() {
             const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
@@ -599,21 +856,77 @@
             // Mostrar objetos filtrados o todos si no hay búsqueda
             const objectsToRender = searchTerm ? filteredObjects : allObjects;
             
-            objectsList.innerHTML = objectsToRender.map(obj => `
+            objectsList.innerHTML = objectsToRender.map(obj => {
+                // Formatear fecha de adición
+                const addedDate = obj.addedAt || obj.createdAt || obj.timestamp;
+                let addedDateFormatted = 'Fecha desconocida';
+                
+                if (addedDate) {
+                    try {
+                        // Intentar diferentes formatos de fecha
+                        let date;
+                        if (addedDate instanceof Date) {
+                            date = addedDate;
+                        } else if (typeof addedDate === 'string') {
+                            // Si es string, intentar parsearlo
+                            date = new Date(addedDate);
+                        } else if (addedDate.seconds) {
+                            // Si es timestamp de Firebase
+                            date = new Date(addedDate.seconds * 1000);
+                        } else if (typeof addedDate === 'number') {
+                            // Si es número (timestamp)
+                            date = new Date(addedDate);
+                        } else {
+                            date = new Date(addedDate);
+                        }
+                        
+                        // Verificar si la fecha es válida
+                        if (!isNaN(date.getTime())) {
+                            addedDateFormatted = date.toLocaleDateString('es-ES', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                    } catch (error) {
+                        console.warn('Error formateando fecha:', addedDate, error);
+                        addedDateFormatted = 'Fecha inválida';
+                    }
+                }
+                
+                return `
                 <div class="admin-object-item">
-                    <img src="${obj.image || 'https://via.placeholder.com/80x80?text=Sin+Imagen'}" alt="${obj.name}" class="admin-object-image">
+                    <img src="${obj.image || 'https://via.placeholder.com/80x80?text=Sin+Imagen'}" 
+                         alt="${obj.name}" 
+                         class="admin-object-image"
+                         onerror="this.src='https://via.placeholder.com/80x80?text=Error+Carga'"
+                         onload="console.log('Imagen cargada:', this.src)">
                     <div class="admin-object-info">
                         <h4>${obj.name}</h4>
                         <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
                         <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
                         <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
+                        <p><strong>Agregado:</strong> ${addedDateFormatted}</p>
+                        ${obj.image ? `<p><small style="color: #666;">URL: ${obj.image.length > 50 ? obj.image.substring(0, 50) + '...' : obj.image}</small></p>` : ''}
                     </div>
-                    <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div class="admin-object-actions">
+                        <button class="admin-edit-btn" onclick="editObject('${obj.id}')" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
+        
+        // Declarar funciones globales al final
+        window.clearAdminSearch = clearAdminSearch;
+        window.searchAdminObjects = searchAdminObjects;
     </script>
 </body>
 </html>
