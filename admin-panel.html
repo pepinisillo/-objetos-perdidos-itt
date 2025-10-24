@@ -256,7 +256,7 @@
                     <div class="form-group">
                         <label for="objectImageFile">Imagen del objeto</label>
                         <input type="file" id="objectImageFile" accept="image/*">
-                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF, WebP. <strong>Tamaño máximo: 2MB</strong>. <em>Opcional: Si no seleccionas una imagen, se mantendrá la actual.</em></small>
+                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF, WebP. <strong>Tamaño máximo: 2MB</strong>. <em>Las imágenes se comprimen automáticamente para optimizar la carga. Opcional: Si no seleccionas una imagen, se mantendrá la actual.</em></small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary">
@@ -284,6 +284,33 @@
                 
                 <div class="objects-list" id="objectsList">
                     <p>Cargando objetos...</p>
+                </div>
+                
+                <!-- Controles de paginación -->
+                <div id="paginationControls" style="display: none; text-align: center; padding: 1rem; border-top: 1px solid #eee; margin-top: 1rem;">
+                    <button onclick="prevPage()" id="prevBtn" style="
+                        background: #6c757d; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 4px; 
+                        cursor: pointer; 
+                        margin: 0 4px;
+                        font-size: 14px;
+                    ">← Anterior</button>
+                    
+                    <span id="pageInfo" style="margin: 0 16px; color: #666; font-size: 14px;"></span>
+                    
+                    <button onclick="nextPage()" id="nextBtn" style="
+                        background: #007bff; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 4px; 
+                        cursor: pointer; 
+                        margin: 0 4px;
+                        font-size: 14px;
+                    ">Siguiente →</button>
                 </div>
             </div>
         </div>
@@ -333,20 +360,54 @@
         // Inicializar Storage
         const storage = getStorage();
 
-        // Convertir archivo a base64
+        // Convertir archivo a base64 con compresión
         async function convertToBase64(file) {
             try {
+                // Comprimir imagen antes de convertir a base64
+                const compressedFile = await compressImage(file, 0.8, 800); // 80% calidad, max 800px
+                
                 const base64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
                     reader.onerror = reject;
-                    reader.readAsDataURL(file);
+                    reader.readAsDataURL(compressedFile);
                 });
                 return base64;
             } catch (error) {
                 console.error('Error convirtiendo a base64:', error);
                 throw new Error('Error procesando la imagen');
             }
+        }
+
+        // Función para comprimir imágenes
+        function compressImage(file, quality = 0.8, maxWidth = 800) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = () => {
+                    // Calcular nuevas dimensiones manteniendo proporción
+                    let { width, height } = img;
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Dibujar imagen redimensionada
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convertir a blob con compresión
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/jpeg', quality);
+                };
+                
+                img.src = URL.createObjectURL(file);
+            });
         }
 
         
@@ -358,7 +419,8 @@
         // Establecer fecha actual por defecto
         document.getElementById('objectDate').value = new Date().toISOString().split('T')[0];
         
-        // Cargar objetos al iniciar
+        // Cargar objetos al iniciar con indicador de carga
+        showLoadingState();
         loadObjects();
         
         // Configurar buscador
@@ -390,9 +452,9 @@
             
             // Procesar imagen a base64
             try {
-                showNotification('Procesando imagen...', 'info');
+                showNotification('Comprimiendo y procesando imagen...', 'info');
                 finalImageUrl = await convertToBase64(imageFile);
-                showNotification('¡Imagen procesada exitosamente!', 'success');
+                showNotification('¡Imagen optimizada y procesada exitosamente!', 'success');
             } catch (error) {
                 console.error('Procesamiento de imagen falló:', error);
                 showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
@@ -433,38 +495,39 @@
             }
         });
         
-        // Cargar objetos
+        // Mostrar estado de carga
+        function showLoadingState() {
+            objectsList.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <p style="margin-top: 1rem; color: #666;">Cargando objetos...</p>
+                </div>
+                <style>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            `;
+        }
+
+        // Cargar objetos con optimización
         async function loadObjects() {
             try {
                 console.log('Iniciando carga de objetos...');
                 const objects = await getAllLostObjectsSecure();
-                console.log('Objetos obtenidos de Firebase:', objects);
-                
-                // Debug: mostrar formato de fechas
-                console.log('Objetos cargados:', objects.length);
-                if (objects.length > 0) {
-                    console.log('Primer objeto:', objects[0]);
-                    console.log('Campos de fecha disponibles:', {
-                        addedAt: objects[0].addedAt,
-                        createdAt: objects[0].createdAt,
-                        timestamp: objects[0].timestamp,
-                        date: objects[0].date
-                    });
-                }
+                console.log('Objetos obtenidos de Firebase:', objects.length);
                 
                 // Ordenar del más reciente al más viejo por fecha de adición
                 allObjects = objects.sort((a, b) => {
-                    // Función helper para obtener fecha
                     const getDate = (obj) => {
                         const dateField = obj.addedAt || obj.createdAt || obj.timestamp || obj.date;
                         if (!dateField) return new Date(0);
                         
-                        // Si es timestamp de Firebase
                         if (dateField.seconds) {
                             return new Date(dateField.seconds * 1000);
                         }
                         
-                        // Si es string o número
                         const date = new Date(dateField);
                         return isNaN(date.getTime()) ? new Date(0) : date;
                     };
@@ -474,14 +537,16 @@
                     
                     return dateB - dateA; // Más reciente primero
                 });
+                
                 filteredObjects = [...allObjects];
-                console.log('Objetos ordenados:', allObjects);
-                renderAdminObjects();
                 totalObjects.textContent = objects.length;
-                console.log('Objetos renderizados exitosamente');
+                
+                // Renderizar con lazy loading
+                renderAdminObjectsLazy();
+                console.log('Objetos cargados exitosamente');
             } catch (error) {
                 console.error('Error cargando objetos:', error);
-                objectsList.innerHTML = '<p>Error cargando objetos: ' + error.message + '</p>';
+                objectsList.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 2rem;">Error cargando objetos: ' + error.message + '</p>';
             }
         }
         
@@ -577,9 +642,9 @@
 
             // Procesar imagen a base64
             try {
-                showNotification('Procesando imagen...', 'info');
+                showNotification('Comprimiendo y procesando imagen...', 'info');
                 finalImageUrl = await convertToBase64(imageFile);
-                showNotification('¡Imagen procesada exitosamente!', 'success');
+                showNotification('¡Imagen optimizada y procesada exitosamente!', 'success');
             } catch (error) {
                 console.error('Procesamiento de imagen falló:', error);
                 showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
@@ -785,6 +850,8 @@
         // Variables globales para el buscador
         let allObjects = [];
         let filteredObjects = [];
+        let currentPage = 0;
+        const objectsPerPage = 10;
         
         // Función para normalizar texto (quitar acentos)
         function normalizeText(text) {
@@ -837,50 +904,50 @@
             renderAdminObjects();
         }
         
-        // Función para renderizar objetos (modificada)
-        function renderAdminObjects() {
+        // Función para renderizar objetos con lazy loading
+        function renderAdminObjectsLazy() {
             const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
             
             // Si hay texto de búsqueda pero no hay resultados
             if (searchTerm && filteredObjects.length === 0) {
-                objectsList.innerHTML = '<p>No se encontraron objetos con ese nombre</p>';
+                objectsList.innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">No se encontraron objetos con ese nombre</p>';
                 return;
             }
             
             // Si no hay texto de búsqueda y no hay objetos en total
             if (!searchTerm && allObjects.length === 0) {
-                objectsList.innerHTML = '<p>No hay objetos registrados</p>';
+                objectsList.innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">No hay objetos registrados</p>';
                 return;
             }
             
             // Mostrar objetos filtrados o todos si no hay búsqueda
             const objectsToRender = searchTerm ? filteredObjects : allObjects;
             
-            objectsList.innerHTML = objectsToRender.map(obj => {
+            // Limitar a los objetos de la página actual
+            const startIndex = currentPage * objectsPerPage;
+            const endIndex = startIndex + objectsPerPage;
+            const limitedObjects = objectsToRender.slice(startIndex, endIndex);
+            
+            objectsList.innerHTML = limitedObjects.map((obj, index) => {
                 // Formatear fecha de adición
                 const addedDate = obj.addedAt || obj.createdAt || obj.timestamp;
                 let addedDateFormatted = 'Fecha desconocida';
                 
                 if (addedDate) {
                     try {
-                        // Intentar diferentes formatos de fecha
                         let date;
                         if (addedDate instanceof Date) {
                             date = addedDate;
                         } else if (typeof addedDate === 'string') {
-                            // Si es string, intentar parsearlo
                             date = new Date(addedDate);
                         } else if (addedDate.seconds) {
-                            // Si es timestamp de Firebase
                             date = new Date(addedDate.seconds * 1000);
                         } else if (typeof addedDate === 'number') {
-                            // Si es número (timestamp)
                             date = new Date(addedDate);
                         } else {
                             date = new Date(addedDate);
                         }
                         
-                        // Verificar si la fecha es válida
                         if (!isNaN(date.getTime())) {
                             addedDateFormatted = date.toLocaleDateString('es-ES', {
                                 year: 'numeric',
@@ -897,19 +964,19 @@
                 }
                 
                 return `
-                <div class="admin-object-item">
+                <div class="admin-object-item" style="opacity: 0; animation: fadeIn 0.3s ease-in forwards;" data-index="${index}">
                     <img src="${obj.image || 'https://via.placeholder.com/80x80?text=Sin+Imagen'}" 
                          alt="${obj.name}" 
                          class="admin-object-image"
+                         loading="lazy"
                          onerror="this.src='https://via.placeholder.com/80x80?text=Error+Carga'"
-                         onload="console.log('Imagen cargada:', this.src)">
+                         style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
                     <div class="admin-object-info">
                         <h4>${obj.name}</h4>
                         <p><strong>Categoría:</strong> ${getCategoryName(obj.category)}</p>
                         <p><strong>Ubicación:</strong> ${obj.location || 'No especificado'}</p>
                         <p><strong>Fecha:</strong> ${obj.date || 'Sin fecha'}</p>
                         <p><strong>Agregado:</strong> ${addedDateFormatted}</p>
-                        ${obj.image ? `<p><small style="color: #666;">URL: ${obj.image.length > 50 ? obj.image.substring(0, 50) + '...' : obj.image}</small></p>` : ''}
                     </div>
                     <div class="admin-object-actions">
                         <button class="admin-edit-btn" onclick="editObject('${obj.id}')" title="Editar">
@@ -921,8 +988,97 @@
                     </div>
                 </div>
             `;
-            }).join('');
+            }).join('') + `
+                <style>
+                    @keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                </style>
+            `;
+            
+            
+            // Actualizar controles de paginación
+            updatePaginationControls(objectsToRender.length);
+            
+            // Animar elementos con delay escalonado
+            setTimeout(() => {
+                const items = objectsList.querySelectorAll('.admin-object-item');
+                items.forEach((item, index) => {
+                    setTimeout(() => {
+                        item.style.animationDelay = `${index * 0.1}s`;
+                    }, index * 50);
+                });
+            }, 100);
         }
+
+        // Función para actualizar controles de paginación
+        function updatePaginationControls(totalObjects) {
+            const paginationControls = document.getElementById('paginationControls');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const pageInfo = document.getElementById('pageInfo');
+            
+            const totalPages = Math.ceil(totalObjects / objectsPerPage);
+            
+            if (totalPages <= 1) {
+                paginationControls.style.display = 'none';
+                return;
+            }
+            
+            paginationControls.style.display = 'block';
+            
+            // Actualizar estado de botones
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = currentPage >= totalPages - 1;
+            
+            // Actualizar información de página
+            const startItem = currentPage * objectsPerPage + 1;
+            const endItem = Math.min((currentPage + 1) * objectsPerPage, totalObjects);
+            pageInfo.textContent = `Página ${currentPage + 1} de ${totalPages} (${startItem}-${endItem} de ${totalObjects})`;
+            
+            // Estilos para botones deshabilitados
+            prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+            nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+        }
+
+        // Función para renderizar objetos (compatibilidad)
+        function renderAdminObjects() {
+            currentPage = 0; // Resetear página al buscar
+            renderAdminObjectsLazy();
+        }
+
+        // Función para ir a la página siguiente
+        window.nextPage = function() {
+            const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
+            const objectsToRender = searchTerm ? filteredObjects : allObjects;
+            const totalPages = Math.ceil(objectsToRender.length / objectsPerPage);
+            
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                renderAdminObjectsLazy();
+            }
+        };
+
+        // Función para ir a la página anterior
+        window.prevPage = function() {
+            if (currentPage > 0) {
+                currentPage--;
+                renderAdminObjectsLazy();
+            }
+        };
+
+        // Función para ir a una página específica
+        window.goToPage = function(page) {
+            const searchTerm = normalizeText(document.getElementById('adminObjectSearch').value);
+            const objectsToRender = searchTerm ? filteredObjects : allObjects;
+            const totalPages = Math.ceil(objectsToRender.length / objectsPerPage);
+            
+            if (page >= 0 && page < totalPages) {
+                currentPage = page;
+                renderAdminObjectsLazy();
+            }
+        };
         
         // Declarar funciones globales al final
         window.clearAdminSearch = clearAdminSearch;

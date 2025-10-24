@@ -1,14 +1,85 @@
 // Firebase Integration para Objetos Perdidos ITT (CDN SDK + firebase-config.js)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, onSnapshot, /*query, orderBy,*/ addDoc, doc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, onSnapshot, query, orderBy, limit, getDocs, addDoc, doc, updateDoc, deleteDoc, getCountFromServer, enableNetwork, disableNetwork } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
 // Datos de objetos perdidos (se cargan desde Firebase o datos locales)
 let lostObjects = [];
 
-// Inicializar Firebase
+// Inicializar Firebase con configuraciones optimizadas
 const app = initializeApp(window.firebaseConfig);
 const db = getFirestore(app);
+
+// Configuraciones de optimización para Firebase
+try {
+    // Habilitar persistencia offline para mejor rendimiento
+    enableNetwork(db);
+    
+    console.log('Firebase inicializado con optimizaciones');
+    
+    // Monitorear estado de conexión
+    monitorConnectionStatus();
+    
+} catch (error) {
+    console.warn('No se pudieron aplicar todas las configuraciones de Firebase:', error);
+}
+
+// Función para monitorear el estado de conexión
+function monitorConnectionStatus() {
+    let isOnline = navigator.onLine;
+    let connectionStatus = 'online';
+    
+    // Detectar cambios en la conexión
+    window.addEventListener('online', () => {
+        isOnline = true;
+        connectionStatus = 'online';
+        console.log('Conexión restaurada');
+        updateConnectionIndicator('online');
+    });
+    
+    window.addEventListener('offline', () => {
+        isOnline = false;
+        connectionStatus = 'offline';
+        console.log('Sin conexión a internet');
+        updateConnectionIndicator('offline');
+    });
+    
+    // Verificar estado inicial
+    updateConnectionIndicator(isOnline ? 'online' : 'offline');
+}
+
+// Función para actualizar el indicador de conexión
+function updateConnectionIndicator(status) {
+    let indicator = document.getElementById('connectionIndicator');
+    
+    if (!indicator) {
+        // Crear indicador si no existe
+        indicator = document.createElement('div');
+        indicator.id = 'connectionIndicator';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        `;
+        document.body.appendChild(indicator);
+    }
+    
+    if (status === 'online') {
+        indicator.textContent = 'Conectado';
+        indicator.style.background = '#28a745';
+        indicator.style.color = 'white';
+    } else {
+        indicator.textContent = 'Sin conexión';
+        indicator.style.background = '#dc3545';
+        indicator.style.color = 'white';
+    }
+}
 const storage = getStorage(app);
 
 // Referencias a elementos del DOM
@@ -69,11 +140,90 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
 }
 
-// Inicializar listener en tiempo real
+// Inicializar listener en tiempo real con paginación
 function startRealtimeListener() {
+    // Mostrar indicador de carga
+    showLoadingIndicator();
+    
+    // Cargar solo los primeros 10 objetos inicialmente
+    loadInitialObjects();
+}
+
+// Función para cargar objetos iniciales (solo los primeros 10)
+async function loadInitialObjects() {
+    try {
+        console.log('Cargando objetos iniciales desde Firebase...');
+        
+        // Intentar con timeout más corto y reintentos
+        const items = await loadWithRetry();
+        
+        lostObjects = items;
+        allObjects = items; // Inicialmente solo tenemos los primeros 10
+        console.log(`Objetos iniciales cargados: ${items.length}`);
+        
+        // Ocultar indicador de carga
+        hideLoadingIndicator();
+        
+        renderObjects();
+        renderCategories();
+        updateStats();
+        
+        // Cargar el total de objetos en segundo plano
+        loadTotalCount();
+        
+        // Ahora configurar el listener en tiempo real para actualizaciones
+        setupRealtimeListener();
+        
+    } catch (error) {
+        console.error('Error cargando objetos iniciales:', error);
+        hideLoadingIndicator();
+        showError('Error cargando objetos. Intenta recargar la página.');
+    }
+}
+
+// Función con reintentos inteligentes para cargar datos
+async function loadWithRetry(maxRetries = 3, timeout = 5000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Intento ${attempt}/${maxRetries} de carga...`);
+            
+            // Crear promise con timeout
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Timeout de conexión')), timeout);
+            });
+            
+            const col = collection(db, 'lostObjects');
+            const q = query(col, orderBy('addedAt', 'desc'), limit(10));
+            
+            const dataPromise = getDocs(q);
+            const snapshot = await Promise.race([dataPromise, timeoutPromise]);
+            
+            const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            console.log(`Carga exitosa en intento ${attempt}`);
+            return items;
+            
+        } catch (error) {
+            console.warn(`Intento ${attempt} falló:`, error.message);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`No se pudo conectar después de ${maxRetries} intentos`);
+            }
+            
+            // Esperar antes del siguiente intento (backoff exponencial)
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+            console.log(`Esperando ${delay}ms antes del siguiente intento...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
+// Configurar listener en tiempo real para actualizaciones
+function setupRealtimeListener() {
     const col = collection(db, 'lostObjects');
     onSnapshot(col, (snapshot) => {
+        console.log('Actualizando objetos desde Firebase...');
         const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        
         // Ordenar en cliente por prioridad: addedAt -> timestamp -> date
         items.sort((a, b) => {
             const getTime = (o) => {
@@ -85,14 +235,122 @@ function startRealtimeListener() {
             };
             return getTime(b) - getTime(a);
         });
-        lostObjects = items;
-    renderObjects();
-    renderCategories();
-    updateStats();
-        // renderAdminObjects() se maneja en admin-panel.html
+        
+        // Solo actualizar si hay cambios significativos
+        if (items.length !== lostObjects.length) {
+            lostObjects = items;
+            console.log(`Objetos actualizados: ${items.length}`);
+            
+            renderObjects();
+            renderCategories();
+            updateStats();
+        }
     }, (error) => {
         console.error('Firestore onSnapshot error:', error);
     });
+}
+
+// Función para cargar el total de objetos en segundo plano
+async function loadTotalCount() {
+    try {
+        const { getCountFromServer } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const col = collection(db, 'lostObjects');
+        const snapshot = await getCountFromServer(col);
+        const totalCount = snapshot.data().count;
+        
+        console.log(`Total de objetos en la base de datos: ${totalCount}`);
+        
+        // Actualizar el contador sin recargar la página
+        if (totalObjetos) {
+            totalObjetos.textContent = String(totalCount);
+        }
+        
+    } catch (error) {
+        console.warn('No se pudo obtener el total de objetos:', error);
+        // Si falla, usar el contador de objetos cargados
+        if (totalObjetos) {
+            totalObjetos.textContent = String(lostObjects.length);
+        }
+    }
+}
+
+// Función para cargar más objetos cuando sea necesario
+async function loadMoreObjectsIfNeeded() {
+    if (isLoadingMore) return;
+    
+    const totalNeeded = currentPage * itemsPerPage;
+    if (allObjects.length >= totalNeeded) return;
+    
+    try {
+        isLoadingMore = true;
+        console.log(`Cargando más objetos... (necesarios: ${totalNeeded}, actuales: ${allObjects.length})`);
+        
+        const { query, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const col = collection(db, 'lostObjects');
+        
+        // Cargar más objetos
+        const q = query(
+            col,
+            orderBy('addedAt', 'desc'),
+            limit(totalNeeded)
+        );
+        
+        const snapshot = await getDocs(q);
+        const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        allObjects = items;
+        lostObjects = items;
+        
+        console.log(`Objetos cargados: ${items.length}`);
+        
+    } catch (error) {
+        console.error('Error cargando más objetos:', error);
+    } finally {
+        isLoadingMore = false;
+    }
+}
+
+// Función para mostrar indicador de carga
+function showLoadingIndicator() {
+    if (objectsGrid) {
+        objectsGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+                <div style="display: inline-block; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="margin-top: 1rem; color: #666; font-size: 1.1rem;">Cargando objetos perdidos...</p>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+    }
+}
+
+// Función para ocultar indicador de carga
+function hideLoadingIndicator() {
+    // El indicador se reemplazará automáticamente cuando se rendericen los objetos
+}
+
+// Función para mostrar error
+function showError(message) {
+    if (objectsGrid) {
+        objectsGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #dc3545;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.1rem; margin-bottom: 1rem;">${message}</p>
+                <button onclick="location.reload()" style="
+                    background: #007bff; 
+                    color: white; 
+                    border: none; 
+                    padding: 10px 20px; 
+                    border-radius: 5px; 
+                    cursor: pointer;
+                ">Recargar página</button>
+            </div>
+        `;
+    }
 }
 
 // (legacy) eliminado
@@ -440,6 +698,8 @@ function normalizeText(text) {
 let currentPage = 1;
 let itemsPerPage = 10;
 let filteredObjects = [];
+let allObjects = []; // Todos los objetos cargados
+let isLoadingMore = false;
 
 function updateStats() {
     const total = Array.isArray(lostObjects) ? lostObjects.length : 0;
@@ -448,13 +708,17 @@ function updateStats() {
     }
 }
 
-function renderObjects(objectsToRender = lostObjects, resetPage = true) {
+async function renderObjects(objectsToRender = lostObjects, resetPage = true) {
+    console.log('Renderizando objetos...', objectsToRender.length);
     filteredObjects = objectsToRender;
     
     // Solo resetear la página si se especifica
     if (resetPage) {
         currentPage = 1;
     }
+    
+    // Cargar más objetos si es necesario
+    await loadMoreObjectsIfNeeded();
     
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -463,18 +727,45 @@ function renderObjects(objectsToRender = lostObjects, resetPage = true) {
     if (pageObjects.length === 0) {
         objectsGrid.style.display = 'none';
         noObjects.style.display = 'block';
-        document.getElementById('paginationControls').style.display = 'none';
+        const paginationControls = document.getElementById('paginationControls');
+        if (paginationControls) paginationControls.style.display = 'none';
         return;
     }
 
     objectsGrid.style.display = 'grid';
     noObjects.style.display = 'none';
+    
+    console.log(`Mostrando objetos ${startIndex + 1}-${endIndex} de ${filteredObjects.length}`);
 
-    objectsGrid.innerHTML = pageObjects.map(obj => `
-        <div class="object-card" onclick="showObjectDetails('${obj.id}')">
-            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}">` : '<i class="fas fa-image"></i>'}
+    objectsGrid.innerHTML = pageObjects.map((obj, index) => `
+        <div class="object-card" onclick="showObjectDetails('${obj.id}')" style="opacity: 0; animation: fadeInUp 0.5s ease-out forwards;" data-index="${index}">
+            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px 8px 0 0;">` : ''}
+            <div class="no-image" style="display: ${obj.image ? 'none' : 'flex'}; width: 100%; height: 200px; background: #f8f9fa; align-items: center; justify-content: center; border-radius: 8px 8px 0 0; color: #6c757d;">
+                <i class="fas fa-image" style="font-size: 2rem;"></i>
+            </div>
         </div>
-    `).join('');
+    `).join('') + `
+        <style>
+            @keyframes fadeInUp {
+                from { 
+                    opacity: 0; 
+                    transform: translateY(20px); 
+                }
+                to { 
+                    opacity: 1; 
+                    transform: translateY(0); 
+                }
+            }
+        </style>
+    `;
+    
+    // Animar elementos con delay escalonado
+    setTimeout(() => {
+        const cards = objectsGrid.querySelectorAll('.object-card');
+        cards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+        });
+    }, 100);
     
     updatePaginationControls();
 }
@@ -523,18 +814,18 @@ function generatePageNumbers(currentPage, totalPages) {
     pageNumbersContainer.innerHTML = pageNumbersHTML;
 }
 
-function goToPreviousPage() {
+async function goToPreviousPage() {
     if (currentPage > 1) {
         currentPage--;
-        renderObjects(filteredObjects, false); // No resetear página
+        await renderObjects(filteredObjects, false); // No resetear página
     }
 }
 
-function goToNextPage() {
+async function goToNextPage() {
     const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
     if (currentPage < totalPages) {
         currentPage++;
-        renderObjects(filteredObjects, false); // No resetear página
+        await renderObjects(filteredObjects, false); // No resetear página
         // Scroll automático hacia la sección de objetos
         const objetosSection = document.getElementById('objetos');
         if (objetosSection) {
@@ -543,18 +834,18 @@ function goToNextPage() {
     }
 }
 
-function changeItemsPerPage() {
+async function changeItemsPerPage() {
     itemsPerPage = parseInt(document.getElementById('itemsPerPageSelect').value);
     currentPage = 1;
-    renderObjects(filteredObjects, true); // Resetear página cuando cambia items por página
+    await renderObjects(filteredObjects, true); // Resetear página cuando cambia items por página
 }
 
-function goToPage(pageNumber) {
+async function goToPage(pageNumber) {
     const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
     if (pageNumber >= 1 && pageNumber <= totalPages) {
         const previousPage = currentPage;
         currentPage = pageNumber;
-        renderObjects(filteredObjects, false); // No resetear página
+        await renderObjects(filteredObjects, false); // No resetear página
         
         // Scroll automático solo si se va hacia adelante (número mayor)
         if (pageNumber > previousPage) {
