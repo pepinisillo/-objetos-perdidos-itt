@@ -5,6 +5,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstati
 
 // Datos de objetos perdidos (se cargan desde Firebase o datos locales)
 let lostObjects = [];
+let totalObjectsCount = 0; // Total de objetos en la base de datos
 
 // Inicializar Firebase con configuraciones optimizadas
 const app = initializeApp(window.firebaseConfig);
@@ -204,14 +205,21 @@ async function loadTotalCount() {
         
         console.log(`Total de objetos en la base de datos: ${totalCount}`);
         
+        // Guardar el total para la paginación
+        totalObjectsCount = totalCount;
+        
         // Actualizar el contador sin recargar la página
         if (totalObjetos) {
             totalObjetos.textContent = String(totalCount);
         }
         
+        // Actualizar paginación con el total correcto
+        updatePaginationControls();
+        
     } catch (error) {
         console.warn('No se pudo obtener el total de objetos:', error);
         // Si falla, usar el contador de objetos cargados
+        totalObjectsCount = lostObjects.length;
         if (totalObjetos) {
             totalObjetos.textContent = String(lostObjects.length);
         }
@@ -715,10 +723,12 @@ async function renderObjects(objectsToRender = lostObjects, resetPage = true) {
 }
 
 function updatePaginationControls() {
-    const totalPages = Math.ceil(totalObjectsCount / itemsPerPage);
+    // Usar totalObjectsCount si está disponible, sino usar filteredObjects.length
+    const totalObjects = totalObjectsCount > 0 ? totalObjectsCount : filteredObjects.length;
+    const totalPages = Math.ceil(totalObjects / itemsPerPage);
     const paginationControls = document.getElementById('paginationControls');
     
-    if (totalPages <= 1) {
+    if (totalObjects === 0 || totalPages <= 1) {
         paginationControls.style.display = 'none';
         return;
     }
