@@ -17,69 +17,13 @@ try {
     
     console.log('Firebase inicializado con optimizaciones');
     
-    // Monitorear estado de conexión
-    monitorConnectionStatus();
+    // Monitoreo de conexión deshabilitado
     
 } catch (error) {
     console.warn('No se pudieron aplicar todas las configuraciones de Firebase:', error);
 }
 
-// Función para monitorear el estado de conexión
-function monitorConnectionStatus() {
-    let isOnline = navigator.onLine;
-    let connectionStatus = 'online';
-    
-    // Detectar cambios en la conexión
-    window.addEventListener('online', () => {
-        isOnline = true;
-        connectionStatus = 'online';
-        console.log('Conexión restaurada');
-        updateConnectionIndicator('online');
-    });
-    
-    window.addEventListener('offline', () => {
-        isOnline = false;
-        connectionStatus = 'offline';
-        console.log('Sin conexión a internet');
-        updateConnectionIndicator('offline');
-    });
-    
-    // Verificar estado inicial
-    updateConnectionIndicator(isOnline ? 'online' : 'offline');
-}
-
-// Función para actualizar el indicador de conexión
-function updateConnectionIndicator(status) {
-    let indicator = document.getElementById('connectionIndicator');
-    
-    if (!indicator) {
-        // Crear indicador si no existe
-        indicator = document.createElement('div');
-        indicator.id = 'connectionIndicator';
-        indicator.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        `;
-        document.body.appendChild(indicator);
-    }
-    
-    if (status === 'online') {
-        indicator.textContent = 'Conectado';
-        indicator.style.background = '#28a745';
-        indicator.style.color = 'white';
-    } else {
-        indicator.textContent = 'Sin conexión';
-        indicator.style.background = '#dc3545';
-        indicator.style.color = 'white';
-    }
-}
+// Funciones de conexión removidas
 const storage = getStorage(app);
 
 // Referencias a elementos del DOM
@@ -739,8 +683,8 @@ async function renderObjects(objectsToRender = lostObjects, resetPage = true) {
 
     objectsGrid.innerHTML = pageObjects.map((obj, index) => `
         <div class="object-card" onclick="showObjectDetails('${obj.id}')" style="opacity: 0; animation: fadeInUp 0.5s ease-out forwards;" data-index="${index}">
-            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px 8px 0 0;">` : ''}
-            <div class="no-image" style="display: ${obj.image ? 'none' : 'flex'}; width: 100%; height: 200px; background: #f8f9fa; align-items: center; justify-content: center; border-radius: 8px 8px 0 0; color: #6c757d;">
+            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width: 100%; height: 200px; object-fit: cover; border-radius: 16px;">` : ''}
+            <div class="no-image" style="display: ${obj.image ? 'none' : 'flex'}; width: 100%; height: 200px; background: #f8f9fa; align-items: center; justify-content: center; border-radius: 16px; color: #6c757d;">
                 <i class="fas fa-image" style="font-size: 2rem;"></i>
             </div>
         </div>
@@ -771,7 +715,7 @@ async function renderObjects(objectsToRender = lostObjects, resetPage = true) {
 }
 
 function updatePaginationControls() {
-    const totalPages = Math.ceil(filteredObjects.length / itemsPerPage);
+    const totalPages = Math.ceil(totalObjectsCount / itemsPerPage);
     const paginationControls = document.getElementById('paginationControls');
     
     if (totalPages <= 1) {
