@@ -691,8 +691,8 @@ async function renderObjects(objectsToRender = lostObjects, resetPage = true) {
 
     objectsGrid.innerHTML = pageObjects.map((obj, index) => `
         <div class="object-card" onclick="showObjectDetails('${obj.id}')" style="opacity: 0; animation: fadeInUp 0.5s ease-out forwards;" data-index="${index}">
-            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width: 100%; height: 200px; object-fit: cover; border-radius: 16px;">` : ''}
-            <div class="no-image" style="display: ${obj.image ? 'none' : 'flex'}; width: 100%; height: 200px; background: #f8f9fa; align-items: center; justify-content: center; border-radius: 16px; color: #6c757d;">
+            ${obj.image ? `<img src="${obj.image}" alt="${obj.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width: 100%; height: 100%; object-fit: cover; display: block;">` : ''}
+            <div class="no-image" style="display: ${obj.image ? 'none' : 'flex'}; width: 100%; height: 100%; background: #f8f9fa; align-items: center; justify-content: center; color: #6c757d;">
                 <i class="fas fa-image" style="font-size: 2rem;"></i>
             </div>
         </div>
