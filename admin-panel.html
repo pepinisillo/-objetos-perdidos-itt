@@ -256,7 +256,7 @@
                     <div class="form-group">
                         <label for="objectImageFile">Imagen del objeto</label>
                         <input type="file" id="objectImageFile" accept="image/*">
-                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF, WebP. <strong>Tamaño máximo: 2MB</strong>. <em>Las imágenes se comprimen automáticamente para optimizar la carga. Opcional: Si no seleccionas una imagen, se mantendrá la actual.</em></small>
+                        <small class="form-text">Formatos permitidos: JPG, PNG, GIF, WebP. <strong>Las imagenes grandes se comprimen automaticamente.</strong> <em>Opcional: Si no seleccionas una imagen, se mantendra la actual.</em></small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary">
@@ -360,17 +360,23 @@
         // Inicializar Storage
         const storage = getStorage();
 
-        // Convertir archivo a base64 con compresión
+        // Límite máximo de tamaño para base64 (1MB para asegurar que funcione bien en Firestore)
+        const MAX_IMAGE_SIZE = 1 * 1024 * 1024; // 1MB en bytes
+        
+        // Convertir archivo a base64 con compresión automática
         async function convertToBase64(file) {
             try {
-                // Comprimir imagen antes de convertir a base64
-                const compressedFile = await compressImage(file, 0.8, 800); // 80% calidad, max 800px
+                console.log('Tamaño original:', (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                
+                // Comprimir imagen hasta que esté por debajo del límite
+                const compressedBlob = await compressImageUntilFits(file, MAX_IMAGE_SIZE);
+                console.log('Tamaño comprimido:', (compressedBlob.size / 1024 / 1024).toFixed(2) + 'MB');
                 
                 const base64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
                     reader.onerror = reject;
-                    reader.readAsDataURL(compressedFile);
+                    reader.readAsDataURL(compressedBlob);
                 });
                 return base64;
             } catch (error) {
@@ -379,9 +385,47 @@
             }
         }
 
+        // Función para comprimir imagen hasta que quepa en el límite
+        async function compressImageUntilFits(file, maxSize) {
+            let quality = 0.9; // Empezar con alta calidad
+            let maxWidth = 1200; // Ancho máximo inicial
+            const minQuality = 0.1; // Calidad mínima permitida
+            const minWidth = 400; // Ancho mínimo permitido
+            
+            let compressedBlob = await compressImage(file, quality, maxWidth);
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            // Reducir calidad y/o tamaño hasta que quepa
+            while (compressedBlob.size > maxSize && attempts < maxAttempts) {
+                attempts++;
+                console.log(`Intento ${attempts}: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB - Calidad: ${quality.toFixed(2)} - Ancho: ${maxWidth}px`);
+                
+                // Primero reducir calidad
+                if (quality > minQuality) {
+                    quality -= 0.1;
+                }
+                
+                // Si la calidad ya es baja, reducir también el tamaño
+                if (quality <= 0.5 && maxWidth > minWidth) {
+                    maxWidth -= 200;
+                }
+                
+                compressedBlob = await compressImage(file, Math.max(quality, minQuality), Math.max(maxWidth, minWidth));
+            }
+            
+            if (compressedBlob.size > maxSize) {
+                console.warn('No se pudo comprimir lo suficiente. Tamaño final:', (compressedBlob.size / 1024 / 1024).toFixed(2) + 'MB');
+            } else {
+                console.log('Compresión exitosa. Tamaño final:', (compressedBlob.size / 1024 / 1024).toFixed(2) + 'MB');
+            }
+            
+            return compressedBlob;
+        }
+
         // Función para comprimir imágenes
         function compressImage(file, quality = 0.8, maxWidth = 800) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
@@ -402,10 +446,15 @@
                     
                     // Convertir a blob con compresión
                     canvas.toBlob((blob) => {
-                        resolve(blob);
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Error al crear blob de imagen'));
+                        }
                     }, 'image/jpeg', quality);
                 };
                 
+                img.onerror = () => reject(new Error('Error al cargar imagen'));
                 img.src = URL.createObjectURL(file);
             });
         }
@@ -441,22 +490,16 @@
                 return;
             }
             
-            // Validar tamaño de archivo (2MB máximo)
-            const maxSize = 2 * 1024 * 1024; // 2MB en bytes
-            if (imageFile.size > maxSize) {
-                showNotification('La imagen es muy grande. Máximo 2MB. Comprime la imagen antes de subirla.', 'error');
-                return;
-            }
-            
             let finalImageUrl = '';
             
-            // Procesar imagen a base64
+            // Procesar imagen a base64 (se comprime automaticamente si es muy grande)
             try {
-                showNotification('Comprimiendo y procesando imagen...', 'info');
+                const sizeMB = (imageFile.size / 1024 / 1024).toFixed(2);
+                showNotification(`Procesando imagen (${sizeMB}MB)... Se comprimira si es necesario`, 'info');
                 finalImageUrl = await convertToBase64(imageFile);
-                showNotification('¡Imagen optimizada y procesada exitosamente!', 'success');
+                showNotification('Imagen procesada exitosamente', 'success');
             } catch (error) {
-                console.error('Procesamiento de imagen falló:', error);
+                console.error('Procesamiento de imagen fallo:', error);
                 showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
                 return;
             }
@@ -631,27 +674,21 @@
         const imageFile = document.getElementById('objectImageFile').files[0];
         let finalImageUrl = originalObject.image; // Usar imagen existente por defecto
 
-        // Solo procesar nueva imagen si se seleccionó una
+        // Solo procesar nueva imagen si se selecciono una
         if (imageFile) {
-            // Validar tamaño de archivo (2MB máximo)
-            const maxSize = 2 * 1024 * 1024; // 2MB en bytes
-            if (imageFile.size > maxSize) {
-                showNotification('La imagen es muy grande. Máximo 2MB. Comprime la imagen antes de subirla.', 'error');
-                return;
-            }
-
-            // Procesar imagen a base64
+            // Procesar imagen a base64 (se comprime automaticamente si es muy grande)
             try {
-                showNotification('Comprimiendo y procesando imagen...', 'info');
+                const sizeMB = (imageFile.size / 1024 / 1024).toFixed(2);
+                showNotification(`Procesando imagen (${sizeMB}MB)... Se comprimira si es necesario`, 'info');
                 finalImageUrl = await convertToBase64(imageFile);
-                showNotification('¡Imagen optimizada y procesada exitosamente!', 'success');
+                showNotification('Imagen procesada exitosamente', 'success');
             } catch (error) {
-                console.error('Procesamiento de imagen falló:', error);
+                console.error('Procesamiento de imagen fallo:', error);
                 showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
                 return;
             }
         } else {
-            console.log('No se seleccionó nueva imagen, manteniendo la existente');
+            console.log('No se selecciono nueva imagen, manteniendo la existente');
         }
             
             // Convertir Timestamp de Firebase a Date
