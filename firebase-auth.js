@@ -121,6 +121,10 @@ async function addLostObjectSecure(objectData) {
         });
         return { success: true, id: docRef.id };
     } catch (error) {
+        // Detectar error de tamaño de Firestore
+        if (error.message.includes('exceeds the maximum') || error.message.includes('too large') || error.code === 'invalid-argument') {
+            throw new Error('La imagen es demasiado grande. Intenta con una imagen mas pequena o de menor resolucion.');
+        }
         throw new Error('Error agregando objeto: ' + error.message);
     }
 }
