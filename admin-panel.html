@@ -234,24 +234,14 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="objectDescription">Descripción (opcional)</label>
-                        <textarea id="objectDescription" placeholder="Descripción detallada del objeto..."></textarea>
+                        <label for="objectDescription">Descripcion (opcional)</label>
+                        <textarea id="objectDescription" placeholder="Descripcion del objeto..."></textarea>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="objectKeywords">Palabras clave (opcional, separadas por coma)</label>
-                        <input type="text" id="objectKeywords" placeholder="cel, celular, teléfono, iphone">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="objectLocation">Ubicación donde se encontró (opcional)</label>
-                        <input type="text" id="objectLocation" placeholder="Ej: Aula 205">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="objectDate">Fecha (opcional)</label>
-                        <input type="date" id="objectDate">
-                    </div>
+                    <!-- Campos ocultos para simplificar el formulario -->
+                    <input type="hidden" id="objectKeywords" value="">
+                    <input type="hidden" id="objectLocation" value="">
+                    <input type="hidden" id="objectDate" value="">
                     
                     <div class="form-group">
                         <label for="objectImageFile">Imagen del objeto</label>
@@ -387,7 +377,7 @@
                 throw new Error('Error procesando la imagen');
             }
         }
-        
+
         // Funcion para comprimir imagenes (siempre comprime para optimizar)
         function compressImage(file) {
             return new Promise((resolve, reject) => {
@@ -456,7 +446,7 @@
                 return;
             }
             
-            const imageFile = document.getElementById('objectImageFile').files[0];            
+            const imageFile = document.getElementById('objectImageFile').files[0];
             // Validar que se haya seleccionado una imagen
             if (!imageFile) {
                 showNotification('Debes seleccionar una imagen del objeto', 'error');
@@ -474,7 +464,7 @@
             } catch (error) {
                 console.error('Error procesando imagen:', error);
                 showNotification('Error procesando la imagen. Intenta con otro archivo.', 'error');
-                return;
+                        return;
             }
             
             const formData = {
@@ -992,10 +982,10 @@
                         <button class="admin-edit-btn" onclick="editObject('${obj.id}')" title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+                    <button class="admin-delete-btn" onclick="deleteObject('${obj.id}')" title="Eliminar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 </div>
             `;
             }).join('') + `
