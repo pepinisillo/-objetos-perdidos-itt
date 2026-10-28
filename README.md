@@ -53,4 +53,4 @@ La página está diseñada para verse bien tanto en computadora como en celular,
 
 ---
 
-Hecho para la comunidad del Instituto Tecnológico de Tijuana.
+Hecho para la comunidad del Instituto Tecnológico de Tijuana Unidad Tomás Aquino.
